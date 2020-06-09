@@ -8,6 +8,7 @@ Created on Thu Jan 23 15:46:01 2020
 """
 import matplotlib
 import numpy
+import os
 import pandas
 import seaborn
 import time
@@ -23,14 +24,29 @@ from PlotTweak import PlotTweak
 
 class ManuscriptFigures:
     
-    def __init__(self, simulationDataFrameCSVFile, figurefolder):
-        simulationDataFrame = pandas.read_csv(simulationDataFrameCSVFile)
+    def __init__(self, emulatorPostprosDataRootFolder, figurefolder):
+        simulationDataFrame = pandas.read_csv(emulatorPostprosDataRootFolder)
 
         # set simulation data as dictionary
         self.simulationCollection = InputSimulation.getSimulationCollection( simulationDataFrame )
         self.figurefolder = figurefolder
+        
+        self.caseCollection = ["LVL3Night",
+                "LVL3Day",
+                "LVL4Night",
+                "LVL4Day"]
+    
+        self.annotationValues = ["(a) LVL3 Night",
+            "(b) LVL3 Day",
+            "(c) LVL4 Night",
+            "(d) LVL4 Day"]
 
+        self.annotationCollection = dict(zip(self.caseCollection, self.annotationValues))
 
+        self.simulationDataFrames = {}
+        for case in self.caseCollection:
+            self.simulationDataFrames[case] = pandas.read_csv( emulatorPostprosDataRootFolder + case + ".csv")
+            self.simulationDataFrames[case] = self.simulationDataFrames[case].set_index("ID", drop = False)
     
     def plot4Sets(self, caseCollection, simulationCollection, annotationCollection, simulationDataFrames,
                   figurefolder, figurename,
@@ -222,34 +238,13 @@ class ManuscriptFigures:
 
 def main():
     
-    figObject = ManuscriptFigures(os.environ["SIMULATIONFIGUREFOLDER"] + "/manuscriptSimulationData.csv", 
-                                  os.environ["SIMULATIONFIGUREFOLDER"])
+    figObject = ManuscriptFigures(os.environ["EMULATORPOSTPROSDATAROOTFOLDER"], 
+                                  os.environ["EMULATORFIGUREFOLDER"])
     
     if True:
         figObject.figure2()
         
         
-    
-    caseCollection = ["LVL3Night",
-                "LVL3Day",
-                "LVL4Night",
-                "LVL4Day"]
-    
-    annotationValues = ["(a) LVL3 Night",
-            "(b) LVL3 Day",
-            "(c) LVL4 Night",
-            "(d) LVL4 Day"]
-    
-    annotationCollection = dict(zip(caseCollection, annotationValues))
-    
-    csvFolder = "/home/aholaj/OneDrive/000_WORK/000_ARTIKKELIT/001_Manuscript_LES_emulator/data/"
-    
-    simulationDataFrames = {}
-    for case in caseCollection:
-        simulationDataFrames[case] = pandas.read_csv( csvFolder + case + ".csv")
-        simulationDataFrames[case] = simulationDataFrames[case].set_index("ID", drop = False)
-        
-    
     simulationCollection ={}
     for case in caseCollection:
         simulationCollection[case] = InputSimulation.getSimulationCollection( 
