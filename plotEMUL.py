@@ -179,9 +179,9 @@ class ManuscriptFigures:
     def figureBarSensitivyData(self):
         
         
-        fig = Figure(self.figurefolder,"figureSensitivityBar", figsize=(12/2.54,5),  ncols = 2, nrows = 2, hspace=0.45, bottom=0.18)
+        fig = Figure(self.figurefolder,"figureSensitivityBar", figsize=(12/2.54,6),  ncols = 2, nrows = 2, hspace=0.5, bottom=0.32)
         
-        
+        grey = Colorful.getDistinctColorList("grey")
         allLabels = []
         for ind,trainingSet in enumerate(self.trainingSetList):
             allLabels = numpy.concatenate((self.sensitivityDataCollection[trainingSet]["designVariableNames"].values, allLabels))
@@ -204,7 +204,7 @@ class ManuscriptFigures:
                 if key == "MainEffect":
                     color = oneColorList
                 else:
-                    color = Colorful.getDistinctColorList("grey")
+                    color = grey
                 dataframe.plot(ax=ax, kind="bar",color=color, stacked=True, x="designVariableNames", y = key, legend = False)
                 
                 margin_bottom += dataframe[key].values
@@ -216,7 +216,13 @@ class ManuscriptFigures:
             ax.set_ylim([0, 0.5])
             PlotTweak.setAnnotation(ax, self.annotationCollection[trainingSet], xPosition=ax.get_xlim()[1]*0.20, yPosition = ax.get_ylim()[1]*0.90)
             PlotTweak.setXaxisLabel(ax,"")
-        # fig.getAxes(0).setLegend(lab)
+        
+        labelColors["Interaction"] = grey
+        fig.getAxes(0).legend(handles=PlotTweak.getPatches(labelColors),
+                                title = "Sensitivity",
+                      loc=(-0.2,-2.6),
+                      ncol = 4,
+                      fontsize = 8)
         fig.save()
     
     def plot4Sets(self, trainingSetList, simulationCollection, annotationCollection, simulationDataFrames,
