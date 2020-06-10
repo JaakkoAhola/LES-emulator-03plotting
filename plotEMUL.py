@@ -225,6 +225,62 @@ class ManuscriptFigures:
                       fontsize = 8)
         fig.save()
     
+    def figureLeaveOneOut(self):
+        
+        
+        fig = Figure(self.figurefolder,"figureLeaveOneOut",  ncols = 2, nrows = 2, bottom = 0.15, hspace = 0.08, wspace=0.04)
+        end = 0.8
+        ticks = numpy.arange(0, end + .01, 0.1)
+        tickLabels = [f"{t:.1f}" for t in ticks]
+        
+        showList = Data.cycleBoolean(len(ticks))
+        
+        showList[-1] = False
+        
+        for ind,trainingSet in enumerate(self.trainingSetList):
+            ax = fig.getAxes(ind)
+            
+            dataframe = self.simulatedVSPredictedCollection[trainingSet]
+            
+            dataframe.plot.scatter(ax = ax, x="wpos_Simulated", y="wpos_Emulated",alpha=0.3)
+            
+            ax.set_ylim([0, end])
+            
+            ax.set_xlim([0, end])
+            
+            
+            PlotTweak.setAnnotation(ax, self.annotationCollection[trainingSet],
+                                    xPosition=ax.get_xlim()[1]*0.05, yPosition = ax.get_ylim()[1]*0.90)
+            
+            PlotTweak.setXaxisLabel(ax,"")
+            PlotTweak.setYaxisLabel(ax,"")
+            
+            if ind in [2,3]:
+                
+                
+                ax.set_xticks(ticks)
+                ax.set_xticklabels(tickLabels)
+                PlotTweak.hideLabels(ax.xaxis, showList)
+            else:
+                PlotTweak.hideXTickLabels(ax)
+
+            
+            if ind in [0,2]:
+                ax.set_yticks(ticks)
+                ax.set_yticklabels(tickLabels)
+                PlotTweak.hideLabels(ax.yaxis, showList)
+            else:
+                
+                PlotTweak.hideYTickLabels(ax)
+            
+            if ind == 2:
+                ax.text(0.5,-0.25, PlotTweak.getUnitLabel("Simulated\ w_{pos}", "m\ s^{-1}"), size=8)
+            if ind == 0:
+                ax.text(-0.2,-0.5, PlotTweak.getUnitLabel("Emulated\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
+                
+        fig.save()
+    
+    
     def plot4Sets(self, trainingSetList, simulationCollection, annotationCollection, simulationDataFrames,
                   figurefolder, figurename,
                   ncVariable, designVariable,
@@ -419,14 +475,15 @@ def main():
                                   os.environ["EMULATORFIGUREFOLDER"])
     
     figObject.readSensitivityData()
-    
+    figObject.readSimulatedVSPredictedData()
     
     
     if False:
         figObject.figurePieSensitivyData()
-    if True:
+    if False:
         figObject.figureBarSensitivyData()
-    
+    if True:
+        figObject.figureLeaveOneOut()
     
         
 if __name__ == "__main__":
