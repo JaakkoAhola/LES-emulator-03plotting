@@ -10,7 +10,9 @@ import matplotlib
 import numpy
 import os
 import pandas
+import pathlib
 import seaborn
+import sys
 import time
 
 sys.path.append("../LES-03plotting")
@@ -25,30 +27,139 @@ from PlotTweak import PlotTweak
 class ManuscriptFigures:
     
     def __init__(self, emulatorPostprosDataRootFolder, figurefolder):
-        simulationDataFrame = pandas.read_csv(emulatorPostprosDataRootFolder)
-
-        # set simulation data as dictionary
-        self.simulationCollection = InputSimulation.getSimulationCollection( simulationDataFrame )
-        self.figurefolder = figurefolder
         
-        self.caseCollection = ["LVL3Night",
-                "LVL3Day",
-                "LVL4Night",
-                "LVL4Day"]
-    
+        self.trainingSetList = ["LVL3Night",
+                               "LVL3Day",
+                               "LVL4Night",
+                               "LVL4Day"]
+
+        self.emulatorPostprosDataRootFolder = pathlib.Path(emulatorPostprosDataRootFolder)
+        self.figurefolder = pathlib.Path(figurefolder)
+        
+        self.simulationCollection = {}
+        for trainingSet in self.trainingSetList:
+            simulationDataFrame = pandas.read_csv( self.emulatorPostprosDataRootFolder / ( trainingSet + ".csv" )  )
+            simulationDataFrame = simulationDataFrame.set_index("ID", drop = False)
+            self.simulationCollection[trainingSet] = InputSimulation.getSimulationCollection( simulationDataFrame )
+        
         self.annotationValues = ["(a) LVL3 Night",
             "(b) LVL3 Day",
             "(c) LVL4 Night",
             "(d) LVL4 Day"]
 
-        self.annotationCollection = dict(zip(self.caseCollection, self.annotationValues))
+        self.annotationCollection = dict(zip(self.trainingSetList, self.annotationValues))
+        
+    def readSimulatedVSPredictedData(self):
+        self.simulatedVSPredictedCollection = {}
+        for trainingSet in self.trainingSetList:
+            self.simulatedVSPredictedCollection[trainingSet] = pandas.read_csv( self.emulatorPostprosDataRootFolder / trainingSet / ( trainingSet + "_simulatedVSPredictedData.csv" ) )
 
-        self.simulationDataFrames = {}
-        for case in self.caseCollection:
-            self.simulationDataFrames[case] = pandas.read_csv( emulatorPostprosDataRootFolder + case + ".csv")
-            self.simulationDataFrames[case] = self.simulationDataFrames[case].set_index("ID", drop = False)
+    def readSensitivityData(self):
+        self.sensitivityDataCollection = {}
+        for trainingSet in self.trainingSetList:
+            self.sensitivityDataCollection[trainingSet] = pandas.read_csv( self.emulatorPostprosDataRootFolder / trainingSet / ( trainingSet + "_sensitivityAnalysis.csv" ) )
+        
+            
+    def loadTimeSeriesLESData(self):
+        # load ts-datasets and change their time coordinates to hours
+        keisseja = 10  # TODO REMOVE THIS
+        for trainingSet in self.trainingSetList:
+            for emul in list(self.simulationCollection[trainingSet])[:keisseja]:
+                
+                self.simulationCollection[trainingSet][emul].getTSDataset()
+                self.simulationCollection[trainingSet][emul].setTimeCoordToHours()
+                
+    def loadProfileLESData(self):
+        # load ts-datasets and change their time coordinates to hours
+        keisseja = 10  # TODO REMOVE THIS
+        for trainingSet in self.trainingSetList:
+            for emul in list(self.simulationCollection[trainingSet])[:keisseja]:
+                self.simulationCollection[trainingSet][emul].getPSDataset()
+                self.simulationCollection[trainingSet][emul].setTimeCoordToHours()
     
-    def plot4Sets(self, caseCollection, simulationCollection, annotationCollection, simulationDataFrames,
+    def getCloudTopOutliers(self):
+        self.cloudTopOutliers= {}
+        
+    def getPairedColorList(numberOfElements):
+        if numberOfElements %2 != 0:
+            sys.exit("Not divisible by two")
+            
+        bright = seaborn.color_palette("hls", int(numberOfElements/2))
+        dark = seaborn.hls_palette(int(numberOfElements/2), l=.3, s=.8)
+        
+        paired = []
+        for i in range(int(numberOfElements/2)):
+            paired.append(bright[i])
+            paired.append(dark[i])
+                    
+                       
+        return paired
+        
+    def getColorsForLabels(labels):
+        labels = list(labels)
+        uniqueLabels = []
+        
+        for label in labels:
+            if label not in uniqueLabels:
+                uniqueLabels.append(label)
+        
+        uniqueColors =  ManuscriptFigures.getPairedColorList( len(uniqueLabels) )
+        labelColors = dict(zip(uniqueLabels, uniqueColors))
+        
+        colorList = []
+        for label in labels:
+            colorList.append(labelColors[label])
+        
+        return colorList, labelColors
+        
+    def figurePieSensitivyData(self):
+        
+        
+        fig = Figure(self.figurefolder,"figureSensitivityPie", ncols = 2, nrows = 3, left = 0.01, right=0.99, hspace = 0.01, bottom=0.01 )
+        
+        
+        allLabels = []
+        for ind,trainingSet in enumerate(self.trainingSetList):
+            maineffectLabel = [ label + " ME"  for label in  self.sensitivityDataCollection[trainingSet]["designVariableNames"].values ]
+            interactionLabel = [ label + " IA" for label in  self.sensitivityDataCollection[trainingSet]["designVariableNames"].values ]
+            stackedLabels = numpy.vstack((maineffectLabel,interactionLabel)).T.reshape(self.sensitivityDataCollection[trainingSet].shape[0]*2,)
+            
+            allLabels = numpy.concatenate((stackedLabels, allLabels))
+            
+        colorList, labelColors = ManuscriptFigures.getColorsForLabels(allLabels)
+        
+        for ind,trainingSet in enumerate(self.trainingSetList):
+            print(ind,trainingSet)
+            ax = fig.getAxes(ind)
+            
+            maineffect = self.sensitivityDataCollection[trainingSet]["MainEffect"]
+            interaction = self.sensitivityDataCollection[trainingSet]["Interaction"]
+            stackedData = numpy.vstack((maineffect,interaction)).T.reshape(self.sensitivityDataCollection[trainingSet].shape[0]*2,)
+            
+            maineffectLabel = [ label + " ME"  for label in  self.sensitivityDataCollection[trainingSet]["designVariableNames"].values ]
+            interactionLabel = [ label + " IA" for label in  self.sensitivityDataCollection[trainingSet]["designVariableNames"].values ]
+            stackedLabels = numpy.vstack((maineffectLabel,interactionLabel)).T.reshape(self.sensitivityDataCollection[trainingSet].shape[0]*2,)
+            
+            colors = []
+            for lab in stackedLabels:
+                colors.append(labelColors[lab])
+            
+            ax.pie( stackedData, colors=colors )
+            PlotTweak.setAnnotation(ax, self.annotationCollection[trainingSet], xPosition=-1.1, yPosition = 1.1)
+            
+            
+        
+        fig.getAxes(4).axis("off")
+        fig.getAxes(4).legend( handles=PlotTweak.getPatches(labelColors),
+                              title = "Sensitivity",
+                      loc=(0.25,0),
+                      ncol = 3,
+                      fontsize = 8)
+        fig.getAxes(5).axis("off")  
+        
+        fig.save()
+    
+    def plot4Sets(self, trainingSetList, simulationCollection, annotationCollection, simulationDataFrames,
                   figurefolder, figurename,
                   ncVariable, designVariable,
                   conversionNC = 1.0, conversionDesign = 1.0,
@@ -57,7 +168,7 @@ class ManuscriptFigures:
                   yAxisLabel = None, yAxisUnit = None, keisseja = 10000,
                   yPositionCorrection = 100, outlierParameter = 0.2):
         
-        relativeChangeDict  = Data.emptyDictionaryWithKeys(caseCollection)
+        relativeChangeDict  = Data.emptyDictionaryWithKeys(trainingSetList)
         print(" ")
         print(figurename)
         # create figure object
@@ -65,7 +176,7 @@ class ManuscriptFigures:
         # plot timeseries with unit conversion
         maks = 0
         mini = 0
-        for ind, case in enumerate(caseCollection):
+        for ind, case in enumerate(trainingSetList):
             for emul in list(simulationCollection[case])[:keisseja]:
                 dataset = simulationCollection[case][emul].getTSDataset()
                 muuttuja = dataset[ncVariable]
@@ -103,7 +214,7 @@ class ManuscriptFigures:
                                                  )
         print("minimi", mini, "maksimi",maks)
             
-        for ind, case in enumerate(caseCollection):
+        for ind, case in enumerate(trainingSetList):
             PlotTweak.setAnnotation(fig.getAxes(True)[ind], annotationCollection[case], xPosition=100, yPosition=ymax-yPositionCorrection)
             PlotTweak.setXLim(fig.getAxes(True)[ind],0,xmax)
             PlotTweak.setYLim(fig.getAxes(True)[ind],0,ymax)
@@ -120,7 +231,7 @@ class ManuscriptFigures:
         return fig, relativeChangeDict
     
     def getLWPFigure(self):
-        lwpFig, lwpChangeParameters = plot4Sets(caseCollection, simulationCollection, annotationCollection, simulationDataFrames, figurefolder, "lwp",
+        lwpFig, lwpChangeParameters = plot4Sets(trainingSetList, simulationCollection, annotationCollection, simulationDataFrames, figurefolder, "lwp",
               "lwp_bar", "lwp",
               conversionNC = 1000., conversionDesign = 1.0,
               xmax = 1000, ymax = 1000,
@@ -132,7 +243,7 @@ class ManuscriptFigures:
         lwpFig.save()
         
     def getCloudTopFigure(self):
-            cloudTopFig, cloudTopParameters = plot4Sets(caseCollection, simulationCollection, annotationCollection, simulationDataFrames, figurefolder, "cloudtop",
+            cloudTopFig, cloudTopParameters = plot4Sets(trainingSetList, simulationCollection, annotationCollection, simulationDataFrames, figurefolder, "cloudtop",
                   "zc", "pblh_m",
                   xmax = 3600, ymax = 3600,
                   xAxisLabel = "Cloud\ top", xAxisUnit = "m",
@@ -150,7 +261,7 @@ class ManuscriptFigures:
         fig2 = Figure(figurefolder,"cloudtopOutliers", ncols=2, nrows=2, sharex=True, sharey = True)
         # plot timeseries with unit conversion
         cloudTopOutliersColors = Colorful.getIndyColorList(len(cloudTopOutliers))
-        for ind, case in enumerate(caseCollection):
+        for ind, case in enumerate(trainingSetList):
             for emulInd, emul in enumerate(cloudTopOutliers):
                 try:
                     simulation = simulationCollection[case][emul]
@@ -167,7 +278,7 @@ class ManuscriptFigures:
         xmax = 3.5
         ymax = 2.5
         
-        for ind, case in enumerate(caseCollection):
+        for ind, case in enumerate(trainingSetList):
             PlotTweak.setAnnotation(fig2.getAxes(True)[ind], annotationCollection[case], xPosition=1.5, yPosition=ymax-0.25)
             PlotTweak.setXLim(fig2.getAxes(True)[ind],0,xmax)
             PlotTweak.setYLim(fig2.getAxes(True)[ind],0,ymax)
@@ -213,7 +324,7 @@ class ManuscriptFigures:
         xmax = 3.5
         ymax = 2.5
         
-        for ind, case in enumerate(caseCollection):
+        for ind, case in enumerate(trainingSetList):
             PlotTweak.setAnnotation(fig2.getAxes(True)[ind], annotationCollection[case], xPosition=1.5, yPosition=ymax-0.25)
             PlotTweak.setXLim(fig2.getAxes(True)[ind],0,xmax)
             PlotTweak.setYLim(fig2.getAxes(True)[ind],0,ymax)
@@ -241,29 +352,17 @@ def main():
     figObject = ManuscriptFigures(os.environ["EMULATORPOSTPROSDATAROOTFOLDER"], 
                                   os.environ["EMULATORFIGUREFOLDER"])
     
+    figObject.readSensitivityData()
+    
+    
+    
     if True:
-        figObject.figure2()
+        figObject.figurePieSensitivyData()
+    if True:
+        pass
+    
+    
         
-        
-    simulationCollection ={}
-    for case in caseCollection:
-        simulationCollection[case] = InputSimulation.getSimulationCollection( 
-                                                         simulationDataFrames[case] )
-    
-    #figure folder
-    figurefolder = "/home/aholaj/OneDrive/000_WORK/000_ARTIKKELIT/001_Manuscript_LES_emulator/figures"
-    cloudTopOutliers = {}
-    
-    # load ts-datasets and change their time coordinates to hours
-    keisseja = 10000  # TODO REMOVE THIS
-    for case in caseCollection:
-        for emul in list(simulationCollection[case])[:keisseja]:
-            print(emul)
-            
-            simulationCollection[case][emul].getTSDataset()
-            #simulationCollection[case][emul].getPSDataset()
-            simulationCollection[case][emul].setTimeCoordToHours()
-    
 if __name__ == "__main__":
     start = time.time()
     main()
