@@ -95,7 +95,7 @@ class ManuscriptFigures:
                        
         return paired
         
-    def getColorsForLabels(labels):
+    def getColorsForLabelsPaired(labels):
         labels = list(labels)
         uniqueLabels = []
         
@@ -106,6 +106,23 @@ class ManuscriptFigures:
         uniqueColors =  ManuscriptFigures.getPairedColorList( len(uniqueLabels) )
         labelColors = dict(zip(uniqueLabels, uniqueColors))
         
+        colorList = []
+        for label in labels:
+            colorList.append(labelColors[label])
+        
+        return colorList, labelColors
+    
+    def getColorsForLabels(labels):
+        labels = list(labels)
+        uniqueLabels = []
+        
+        for label in labels:
+            if label not in uniqueLabels:
+                uniqueLabels.append(label)
+        
+        uniqueColors =  Colorful.getIndyColorList( len(uniqueLabels) )
+        labelColors = dict(zip(uniqueLabels, uniqueColors))
+
         colorList = []
         for label in labels:
             colorList.append(labelColors[label])
@@ -126,7 +143,7 @@ class ManuscriptFigures:
             
             allLabels = numpy.concatenate((stackedLabels, allLabels))
             
-        colorList, labelColors = ManuscriptFigures.getColorsForLabels(allLabels)
+        colorList, labelColors = ManuscriptFigures.getColorsForLabelsPaired(allLabels)
         
         for ind,trainingSet in enumerate(self.trainingSetList):
             print(ind,trainingSet)
@@ -157,6 +174,49 @@ class ManuscriptFigures:
                       fontsize = 8)
         fig.getAxes(5).axis("off")  
         
+        fig.save()
+        
+    def figureBarSensitivyData(self):
+        
+        
+        fig = Figure(self.figurefolder,"figureSensitivityBar", figsize=(12/2.54,5),  ncols = 2, nrows = 2, hspace=0.45, bottom=0.18)
+        
+        
+        allLabels = []
+        for ind,trainingSet in enumerate(self.trainingSetList):
+            allLabels = numpy.concatenate((self.sensitivityDataCollection[trainingSet]["designVariableNames"].values, allLabels))
+            
+        colorList, labelColors = ManuscriptFigures.getColorsForLabels(allLabels)
+        
+        for ind,trainingSet in enumerate(self.trainingSetList):
+            ax = fig.getAxes(ind)
+            
+            dataframe = self.sensitivityDataCollection[trainingSet].sort_values(by=["MainEffect"], ascending=False)
+            
+            nroVariables = dataframe.shape[0]
+            margin_bottom = numpy.zeros(nroVariables)
+            
+            oneColorList = []
+            for variable in dataframe["designVariableNames"]:
+                oneColorList.append(labelColors[variable])
+            
+            for k,key in enumerate(["Interaction","MainEffect"]):
+                if key == "MainEffect":
+                    color = oneColorList
+                else:
+                    color = Colorful.getDistinctColorList("grey")
+                dataframe.plot(ax=ax, kind="bar",color=color, stacked=True, x="designVariableNames", y = key, legend = False)
+                
+                margin_bottom += dataframe[key].values
+            
+            yTicks = numpy.arange(0, 0.51, 0.1)
+            yTickLabels = [f"{t:.1f}" for t in yTicks]
+            ax.set_yticks(yTicks)
+            ax.set_yticklabels(yTickLabels)
+            ax.set_ylim([0, 0.5])
+            PlotTweak.setAnnotation(ax, self.annotationCollection[trainingSet], xPosition=ax.get_xlim()[1]*0.20, yPosition = ax.get_ylim()[1]*0.90)
+            PlotTweak.setXaxisLabel(ax,"")
+        # fig.getAxes(0).setLegend(lab)
         fig.save()
     
     def plot4Sets(self, trainingSetList, simulationCollection, annotationCollection, simulationDataFrames,
@@ -356,10 +416,10 @@ def main():
     
     
     
-    if True:
+    if False:
         figObject.figurePieSensitivyData()
     if True:
-        pass
+        figObject.figureBarSensitivyData()
     
     
         
