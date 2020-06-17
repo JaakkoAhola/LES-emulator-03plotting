@@ -12,6 +12,7 @@ import os
 import pandas
 import pathlib
 import seaborn
+import scipy
 import sys
 import time
 
@@ -219,7 +220,7 @@ class ManuscriptFigures:
         
         labelColors["Interaction"] = grey
         fig.getAxes(0).legend(handles=PlotTweak.getPatches(labelColors),
-                                title = "Sensitivity",
+                                title = "Global variance -based sensitivity for " + PlotTweak.getLatexLabel("w_{pos}", False),
                       loc=(-0.2,-2.6),
                       ncol = 4,
                       fontsize = 8)
@@ -242,6 +243,13 @@ class ManuscriptFigures:
             
             dataframe = self.simulatedVSPredictedCollection[trainingSet]
             
+            simulated = dataframe["wpos_Simulated"]
+            emulated  = dataframe["wpos_Emulated"]
+            
+            slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(simulated, emulated)
+            
+            rSquared = numpy.power(r_value, 2)
+            
             dataframe.plot.scatter(ax = ax, x="wpos_Simulated", y="wpos_Emulated",alpha=0.3)
             
             ax.set_ylim([0, end])
@@ -251,6 +259,8 @@ class ManuscriptFigures:
             
             PlotTweak.setAnnotation(ax, self.annotationCollection[trainingSet],
                                     xPosition=ax.get_xlim()[1]*0.05, yPosition = ax.get_ylim()[1]*0.90)
+            
+            PlotTweak.setAnnotation(ax, PlotTweak.getLatexLabel(f"R^2={rSquared:.2f}",""), xPosition=0.5, yPosition=0.1, bbox_props = None)
             
             PlotTweak.setXaxisLabel(ax,"")
             PlotTweak.setYaxisLabel(ax,"")
@@ -263,7 +273,6 @@ class ManuscriptFigures:
                 PlotTweak.hideLabels(ax.xaxis, showList)
             else:
                 PlotTweak.hideXTickLabels(ax)
-
             
             if ind in [0,2]:
                 ax.set_yticks(ticks)
@@ -480,7 +489,7 @@ def main():
     
     if False:
         figObject.figurePieSensitivyData()
-    if False:
+    if True:
         figObject.figureBarSensitivyData()
     if True:
         figObject.figureLeaveOneOut()
