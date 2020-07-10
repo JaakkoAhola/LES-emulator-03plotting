@@ -59,8 +59,13 @@ class ManuscriptFigures:
         self.sensitivityDataCollection = {}
         for trainingSet in self.trainingSetList:
             self.sensitivityDataCollection[trainingSet] = pandas.read_csv( self.emulatorPostprosDataRootFolder / trainingSet / ( trainingSet + "_sensitivityAnalysis.csv" ) )
+    
+    def readResponseData(self):
+        self.responseDataCollection = {}
+        for trainingSet in self.trainingSetList:
+            self.responseDataCollection[trainingSet] = pandas.read_csv( self.emulatorPostprosDataRootFolder / trainingSet / ( trainingSet + "_responseFromTrainingSimulations.csv" ) )
         
-            
+
     def loadTimeSeriesLESData(self):
         # load ts-datasets and change their time coordinates to hours
         keisseja = 10  # TODO REMOVE THIS
@@ -289,6 +294,96 @@ class ManuscriptFigures:
                 
         fig.save()
     
+    def figureUpdraftLinearFit(self):
+        
+        
+        fig = Figure(self.figurefolder,"figureLinearFit", figsize = [4.724409448818897, 3], ncols = 2, nrows = 1, bottom = 0.25, hspace = 0.08, wspace=0.12, top=0.85)
+        print(fig.getFigSize())
+        xstart = -140
+        xend = 50
+        # xticks = numpy.arange(0, xend + 1, 10)
+        
+        ystart = 0.0
+        yend = 1.0
+        yticks = numpy.arange(0, yend + .01, 0.1)
+        tickLabels = [f"{t:.1f}" for t in yticks]
+        
+        yShowList = Data.cycleBoolean(len(yticks))
+        
+        # yShowList[-1] = False
+        
+        for ind,trainingSet in enumerate(self.trainingSetList[:2]):
+            ax = fig.getAxes(ind)
+            
+            dataframe = self.responseDataCollection[trainingSet]
+            dataframe = dataframe[ dataframe["wpos"] != -999. ]
+            
+            radiativeWarming  = dataframe["drflx"]
+            updraft =  dataframe["wpos"]
+            
+            
+            slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(radiativeWarming, updraft)
+            coef = [slope, intercept]
+            rSquared = numpy.power(r_value, 2)
+            
+            dataColor = Colorful.getDistinctColorList("red")
+            fitColor = "k"
+            dataframe.plot.scatter(ax = ax, x="drflx", y="wpos",alpha=0.3, color = dataColor)
+            
+            poly1d_fn = numpy.poly1d(coef)
+            
+            ax.plot(radiativeWarming.values, poly1d_fn(radiativeWarming.values), color = fitColor)
+            
+            ax.set_xlim([xstart, xend])
+            ax.set_ylim([ystart, yend])
+            
+            
+            PlotTweak.setAnnotation(ax, self.annotationCollection[trainingSet],
+                                    xPosition=PlotTweak.getXPosition(ax, 0.05), yPosition = PlotTweak.getYPosition(ax, 0.9))
+            print(trainingSet, slope, intercept, r_value, p_value, std_err)
+            # PlotTweak.setAnnotation(ax, ,
+            #                         xPosition=0.5, yPosition=0.1, bbox_props = None)
+            
+            PlotTweak.setXaxisLabel(ax,"")
+            PlotTweak.setYaxisLabel(ax,"")
+            
+            
+            xticks = PlotTweak.setXticks(ax, start= xstart, end = xend, interval = 10, integer=True)
+        
+            xShownLabelsBoolean = PlotTweak.setXLabels(ax, xticks, start= xstart, end = xend, interval = 40)
+            xShownLabelsBoolean = Data.cycleBoolean(len(xShownLabelsBoolean))
+            PlotTweak.setXTickSizes(ax, xShownLabelsBoolean)
+            
+            
+            # ax.set_xticks(ticks)
+            # ax.set_xticklabels(tickLabels)
+            # PlotTweak.hideLabels(ax.xaxis, yShowList)
+            
+            if ind == 0:
+                PlotTweak.setArtist(ax, {"Simulated data": dataColor, "Fit" : "k"}, loc = (0.55, 1.05), ncol = 2)
+            
+            ax.text(-30, 0.75,
+                PlotTweak.getLatexLabel("y=a + b * x") + "\n" + \
+                                         PlotTweak.getLatexLabel(f"a={intercept:.4f}") + "\n" + \
+                                             PlotTweak.getLatexLabel(f"b={slope:.6f}") + "\n" + \
+                                           PlotTweak.getLatexLabel(f"R^2={rSquared:.2f}"), fontsize = 6)
+            
+            ax.set_yticks(yticks)
+            ax.set_yticklabels(tickLabels)
+            PlotTweak.setYTickSizes(ax, yShowList)
+            PlotTweak.hideLabels(ax.yaxis, yShowList)
+            
+            if ind in [1,3]:
+                PlotTweak.hideYTickLabels(ax)
+            
+            if ind in [0,1]:
+                PlotTweak.setXaxisLabel(ax,"Cloud\ rad.\ warming", "W\ m^{-2}")
+            if ind == 0:
+                ax.text(PlotTweak.getXPosition(ax, -0.27), PlotTweak.getYPosition(ax, 0.),
+                        PlotTweak.getUnitLabel("Simulated\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
+                # PlotTweak.setYaxisLabel(ax, "Simulated\ Updraft\ velocity", "m\ s^{-1}")
+                
+        fig.save()
     
     def plot4Sets(self, trainingSetList, simulationCollection, annotationCollection, simulationDataFrames,
                   figurefolder, figurename,
@@ -485,14 +580,16 @@ def main():
     
     figObject.readSensitivityData()
     figObject.readSimulatedVSPredictedData()
-    
+    figObject.readResponseData()
     
     if False:
         figObject.figurePieSensitivyData()
-    if True:
+    if False:
         figObject.figureBarSensitivyData()
-    if True:
+    if False:
         figObject.figureLeaveOneOut()
+    if True:
+        figObject.figureUpdraftLinearFit()
     
         
 if __name__ == "__main__":
