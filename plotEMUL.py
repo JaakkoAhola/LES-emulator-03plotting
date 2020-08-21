@@ -24,6 +24,8 @@ from Figure import Figure
 from Plot import Plot
 from PlotTweak import PlotTweak
 
+from sklearn.metrics import mean_squared_error
+from math import sqrt
 
 class ManuscriptFigures:
     
@@ -43,10 +45,10 @@ class ManuscriptFigures:
             simulationDataFrame = simulationDataFrame.set_index("ID", drop = False)
             self.simulationCollection[trainingSet] = InputSimulation.getSimulationCollection( simulationDataFrame )
         
-        self.annotationValues = ["(a) LVL3 Night",
-            "(b) LVL3 Day",
-            "(c) LVL4 Night",
-            "(d) LVL4 Day"]
+        self.annotationValues = ["(a) SB Night",
+            "(b) SB Day",
+            "(c) SALSA Night",
+            "(d) SALSA Day"]
 
         self.annotationCollection = dict(zip(self.trainingSetList, self.annotationValues))
         
@@ -191,14 +193,16 @@ class ManuscriptFigures:
         allLabels = []
         for ind,trainingSet in enumerate(self.trainingSetList):
             allLabels = numpy.concatenate((self.sensitivityDataCollection[trainingSet]["designVariableNames"].values, allLabels))
-            
+        
         colorList, labelColors = ManuscriptFigures.getColorsForLabels(allLabels)
+        
         
         for ind,trainingSet in enumerate(self.trainingSetList):
             ax = fig.getAxes(ind)
             
             dataframe = self.sensitivityDataCollection[trainingSet].sort_values(by=["MainEffect"], ascending=False)
-            
+            dataframe["mathLabel"] = dataframe.apply(lambda row: PlotTweak.getMathLabel(row.designVariableNames), axis=1)
+
             nroVariables = dataframe.shape[0]
             margin_bottom = numpy.zeros(nroVariables)
             
@@ -211,7 +215,7 @@ class ManuscriptFigures:
                     color = oneColorList
                 else:
                     color = grey
-                dataframe.plot(ax=ax, kind="bar",color=color, stacked=True, x="designVariableNames", y = key, legend = False)
+                dataframe.plot(ax=ax, kind="bar",color=color, stacked=True, x="mathLabel", y = key, legend = False)
                 
                 margin_bottom += dataframe[key].values
             
@@ -224,7 +228,16 @@ class ManuscriptFigures:
             PlotTweak.setXaxisLabel(ax,"")
         
         labelColors["Interaction"] = grey
-        fig.getAxes(0).legend(handles=PlotTweak.getPatches(labelColors),
+        
+        mathLabelColors ={}
+        for ind,key in enumerate(dataframe["designVariableNames"]):
+            individualColor = labelColors[key]
+            individualLabel = dataframe.set_index("designVariableNames").loc[key]["mathLabel"]
+            mathLabelColors[individualLabel] = individualColor
+        
+        
+        
+        fig.getAxes(0).legend(handles=PlotTweak.getPatches(mathLabelColors),
                                 title = "Global variance -based sensitivity for " + PlotTweak.getLatexLabel("w_{pos}", False),
                       loc=(-0.2,-2.6),
                       ncol = 4,
@@ -256,6 +269,10 @@ class ManuscriptFigures:
             rSquared = numpy.power(r_value, 2)
             
             dataframe.plot.scatter(ax = ax, x="wpos_Simulated", y="wpos_Emulated",alpha=0.3)
+            
+            coef = [slope, intercept]
+            poly1d_fn = numpy.poly1d(coef)
+            ax.plot(simulated.values, poly1d_fn(simulated.values), color = "k")
             
             ax.set_ylim([0, end])
             
@@ -332,6 +349,11 @@ class ManuscriptFigures:
             
             poly1d_fn = numpy.poly1d(coef)
             
+            linearFit = []
+            for radWarmingValue in list(self.responseDataCollection[trainingSet]["drflx"]):
+                linearFit.append(poly1d_fn(radWarmingValue))
+            
+            self.responseDataCollection[trainingSet]["linearFit"] =linearFit #dataframe.apply(lambda row: poly1d_fn(row.drflx.values), axis = 1)
             ax.plot(radiativeWarming.values, poly1d_fn(radiativeWarming.values), color = fitColor)
             
             ax.set_xlim([xstart, xend])
@@ -373,6 +395,8 @@ class ManuscriptFigures:
             PlotTweak.setYTickSizes(ax, yShowList)
             PlotTweak.hideLabels(ax.yaxis, yShowList)
             
+            
+            
             if ind in [1,3]:
                 PlotTweak.hideYTickLabels(ax)
             
@@ -384,7 +408,116 @@ class ManuscriptFigures:
                 # PlotTweak.setYaxisLabel(ax, "Simulated\ Updraft\ velocity", "m\ s^{-1}")
                 
         fig.save()
-    
+        
+    def figureErrorDistribution(self):
+        fig = Figure(self.figurefolder,"figureErrorDistribution",  ncols = 2, nrows = 2,
+                     bottom = 0.15, hspace = 0.08, wspace=0.04, top=0.90)
+        mini = None
+        maxi = None
+        ymaxi = None
+        xticks = numpy.arange(-0.4, 0.21, 0.1)
+        xtickLabels = [f"{t:.1f}" for t in xticks]
+        xshowList = Data.cycleBoolean(len(xticks))
+        xshowList[-1] = False
+        
+        yticks = numpy.arange(0, 141, 10)
+        ytickLabels = [f"{t:d}" for t in yticks]
+        yshowList = Data.getMaskedList(yticks, numpy.arange(0,141,50))
+        # yshowList[-1] = False
+        emulColor = Colorful.getDistinctColorList("blue")
+        linFitColor = Colorful.getDistinctColorList("red")
+        for ind,trainingSet in enumerate(self.trainingSetList):
+            ax = fig.getAxes(ind)
+            
+            dataframe = self.simulatedVSPredictedCollection[trainingSet]
+            
+            
+            dataframe["absErrorEmul"] = dataframe.apply(lambda row: row.wpos_Simulated - row.wpos_Emulated, axis = 1)
+            
+            emulRMSE = sqrt(mean_squared_error(dataframe["wpos_Simulated"], dataframe["wpos_Emulated"]))
+            
+            print(trainingSet, emulRMSE)
+            
+            dataframe["absErrorEmul"].plot.hist(ax=ax, bins = 20, color = emulColor,  style='--', alpha = 0.5 )
+            
+            if mini is None:
+                mini = dataframe["absErrorEmul"].min()
+            else:
+                mini = min(mini, dataframe["absErrorEmul"].min())
+            
+            if maxi is None:
+                maxi = dataframe["absErrorEmul"].max()
+            else:
+                maxi = max(maxi,  dataframe["absErrorEmul"].min())
+                
+            
+            if ind <2:
+                dataframe2 = self.responseDataCollection[trainingSet]
+                
+                
+                
+                
+                
+                
+                dataframe2["absErrorLinearFit"] = dataframe2.apply(lambda row: row.wpos - row.linearFit, axis = 1)
+                
+                dataframe2Filtered = dataframe2[ dataframe2["wpos"] != -999. ]
+                
+                linfitRMSE = sqrt(mean_squared_error(dataframe2Filtered["wpos"], dataframe2Filtered["linearFit"]))
+                
+                dataframe2Filtered["absErrorLinearFit"].plot.hist(ax=ax, bins = 20, color = linFitColor, style='--', alpha = 0.5 )
+                
+                mini = min(mini, dataframe2Filtered["absErrorLinearFit"].min())
+                maxi = max(maxi, dataframe2Filtered["absErrorLinearFit"].max())
+            
+            if ymaxi is None:
+                ymaxi = ax.get_ylim()[1]
+            else:
+                ymaxi = max(ymaxi, ax.get_ylim()[1])                
+            
+            stringi = f"RMS errors:\nEmulated: {emulRMSE:.4f}"
+            if ind <2:
+                stringi = stringi + f"\nLinear Fit: {linfitRMSE:.4f}"
+            PlotTweak.setAnnotation(ax, stringi,
+                                    xPosition=-0.39, yPosition=60, bbox_props = None)
+            
+            ax.set_xlim([xticks[0], xticks[-1]])
+            ax.set_ylim([0, yticks[-1]])
+            PlotTweak.setXaxisLabel(ax,"")
+            PlotTweak.setYaxisLabel(ax,"")
+            
+            PlotTweak.setAnnotation(ax, self.annotationCollection[trainingSet],
+                                    xPosition=(ax.get_xlim()[1]-ax.get_xlim()[0])*0.02 + ax.get_xlim()[0], yPosition = ax.get_ylim()[1]*0.89)
+            
+            if ind in [2,3]:
+                ax.set_xticks(xticks)
+                ax.set_xticklabels(xtickLabels)
+                PlotTweak.hideLabels(ax.xaxis, xshowList)
+                PlotTweak.setXTickSizes(ax, xshowList)
+            else:
+                PlotTweak.hideXTickLabels(ax)
+            
+            if ind in [0,2]:
+                ax.set_yticks(yticks)
+                ax.set_yticklabels(ytickLabels)
+                PlotTweak.hideLabels(ax.yaxis, yshowList)
+                PlotTweak.setYTickSizes(ax, yshowList)
+            else:
+                
+                PlotTweak.hideYTickLabels(ax)
+            
+            if ind == 2:
+                ax.text(-0.3,-50, PlotTweak.getUnitLabel("Error,\ w-w_{LES},\ for\ predicting\ updraft\ velocity", "m\ s^{-1}"), size=8)
+            if ind == 0:
+                ax.text(-0.55,-80, PlotTweak.getLatexLabel("Number\ of\ points"), size=8 , rotation =90)
+                PlotTweak.setArtist(ax, {"Updraft from emulator": emulColor, "Updraft from linear fit" : linFitColor}, loc = (0.07, 1.05), ncol = 2)
+            
+            #dataframe["emulRMSE"] = dataframe.apply(lambda col: sqrt(mean_squared_error(dataframe["wpos_Simulated"], dataframe["wpos_Emulated"])), axis = 0 )
+        print("xmin: {0}, xmax: {1}".format(mini, maxi))
+        print("ymaxi".format(ymaxi))
+        
+        fig.save()    
+        
     def plot4Sets(self, trainingSetList, simulationCollection, annotationCollection, simulationDataFrames,
                   figurefolder, figurename,
                   ncVariable, designVariable,
@@ -582,14 +715,14 @@ def main():
     figObject.readSimulatedVSPredictedData()
     figObject.readResponseData()
     
-    if False:
-        figObject.figurePieSensitivyData()
-    if False:
+    if True:
         figObject.figureBarSensitivyData()
-    if False:
+    if True:
         figObject.figureLeaveOneOut()
     if True:
         figObject.figureUpdraftLinearFit()
+    if True:
+        figObject.figureErrorDistribution()
     
         
 if __name__ == "__main__":
