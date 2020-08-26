@@ -264,6 +264,25 @@ class ManuscriptFigures:
             simulated = dataframe["wpos_Simulated"]
             emulated  = dataframe["wpos_Emulated"]
             
+            # if ind < 2:
+            #     dataframeFit = self.responseDataCollection[trainingSet]
+            #     simulatedFit = dataframeFit["wpos"]
+            #     fittedFit = dataframeFit["linearFit"]
+                
+            #     slopeFit, interceptFit, r_valueFit, p_valueFit, std_errFit = scipy.stats.linregress(simulatedFit, fittedFit)
+                
+            #     rSquaredFit = numpy.power(r_valueFit,2)
+                
+            #     coefFit = [slopeFit, interceptFit]
+                
+            #     dataframeFit.plot.scatter(ax=ax, x="wpos", y="linearFit", alpha = 0.3, color=Colorful.getDistinctColorList("red"))
+            
+            #     poly1d_fn = numpy.poly1d(coefFit)
+            #     ax.plot(simulatedFit.values, poly1d_fn(simulatedFit.values), color = "grey")
+            #     labelFit= f"R^2={rSquaredFit:.2f}"
+            # else:
+            #     labelFit = ""
+            
             slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(simulated, emulated)
             
             rSquared = numpy.power(r_value, 2)
@@ -405,6 +424,102 @@ class ManuscriptFigures:
             if ind == 0:
                 ax.text(PlotTweak.getXPosition(ax, -0.27), PlotTweak.getYPosition(ax, 0.),
                         PlotTweak.getUnitLabel("Simulated\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
+                # PlotTweak.setYaxisLabel(ax, "Simulated\ Updraft\ velocity", "m\ s^{-1}")
+                
+        fig.save()
+        
+    def figureUpdraftLinearFitVSEMul(self):
+        fig = Figure(self.figurefolder,"figureLinearFitComparison", figsize = [4.724409448818897, 3], 
+                     ncols = 2, nrows = 1, bottom = 0.25, hspace = 0.08, wspace=0.12, top=0.85)
+        # xticks = numpy.arange(0, xend + 1, 10)
+        
+        start = 0.0
+        end = 1.0
+        ticks = numpy.arange(0, end + .01, 0.1)
+        tickLabels = [f"{t:.1f}" for t in ticks]
+        
+        showList = Data.cycleBoolean(len(ticks))
+        
+        showList[-1] = False
+        
+        for ind,trainingSet in enumerate(self.trainingSetList[:2]):
+            ax = fig.getAxes(ind)
+            
+            dataframeFit = self.responseDataCollection[trainingSet]
+            dataframeFit = dataframeFit[ dataframeFit["wpos"] != -999. ]
+            simulatedFit = dataframeFit["wpos"]
+            fittedFit = dataframeFit["linearFit"]
+            
+            slopeFit, interceptFit, r_valueFit, p_valueFit, std_errFit = scipy.stats.linregress(simulatedFit, fittedFit)
+            
+            rSquaredFit = numpy.power(r_valueFit,2)
+            
+            coefFit = [slopeFit, interceptFit]
+            
+            
+            fitColor = "k"
+            dataColor = Colorful.getDistinctColorList("red")
+            
+            dataframeFit.plot.scatter(ax=ax, x="wpos", y="linearFit", alpha = 0.3, color=dataColor)
+        
+            poly1d_fn = numpy.poly1d(coefFit)
+            
+            ax.plot(simulatedFit.values, poly1d_fn(simulatedFit.values), color = fitColor)
+            
+            
+            ax.set_xlim([start, end])
+            ax.set_ylim([start, end])
+            
+            
+            PlotTweak.setAnnotation(ax, self.annotationCollection[trainingSet],
+                                    xPosition=ax.get_xlim()[1]*0.05, yPosition = ax.get_ylim()[1]*0.90)
+            
+            PlotTweak.setAnnotation(ax, PlotTweak.getLatexLabel(f"R^2={rSquaredFit:.2f}",""), xPosition=0.5, yPosition=0.1, bbox_props = None)
+            
+            PlotTweak.setAnnotation(ax, self.annotationCollection[trainingSet],
+                                    xPosition=PlotTweak.getXPosition(ax, 0.05), yPosition = PlotTweak.getYPosition(ax, 0.9))
+            # PlotTweak.setAnnotation(ax, ,
+            #                         xPosition=0.5, yPosition=0.1, bbox_props = None)
+            
+            PlotTweak.setXaxisLabel(ax,"")
+            PlotTweak.setYaxisLabel(ax,"")
+            
+            
+            PlotTweak.setXTickSizes(ax, showList)
+            
+            
+            ax.set_xticks(ticks)
+            ax.set_xticklabels(tickLabels)
+            PlotTweak.hideLabels(ax.xaxis, showList)
+            
+            if ind == 0:
+                PlotTweak.setArtist(ax, {"Simulated data": dataColor, "Fit" : "k"}, loc = (0.55, 1.05), ncol = 2)
+            
+            # ax.text(-30, 0.75,
+            #     PlotTweak.getLatexLabel("y=a + b * x") + "\n" + \
+            #                              PlotTweak.getLatexLabel(f"a={interceptFit:.4f}") + "\n" + \
+            #                                  PlotTweak.getLatexLabel(f"b={slopeFit:.6f}") + "\n" + \
+            #                                PlotTweak.getLatexLabel(f"R^2={rSquared:Fit.2f}"), fontsize = 6)
+            
+            ax.set_yticks(ticks)
+            ax.set_yticklabels(tickLabels)
+            PlotTweak.setYTickSizes(ax, showList)
+            PlotTweak.hideLabels(ax.yaxis, showList)
+            
+            
+            
+            if ind in [1,3]:
+                PlotTweak.hideYTickLabels(ax)
+            
+            if ind == 0:
+                ax.text(0.5,-.3, PlotTweak.getUnitLabel("Updraft\ from\ emulator", "m\ s^{-1}"), size=8)
+            if ind == 0:
+                ax.text(-0.27,0.0, PlotTweak.getUnitLabel("Updraft\ from\ linear\ fit", "m\ s^{-1}"), size=8 , rotation =90)
+            # if ind in [0,1]:
+            #     PlotTweak.setXaxisLabel(ax,"Cloud\ rad.\ warming", "W\ m^{-2}")
+            # if ind == 0:
+            #     ax.text(PlotTweak.getXPosition(ax, -0.27), PlotTweak.getYPosition(ax, 0.),
+            #             PlotTweak.getUnitLabel("Simulated\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
                 # PlotTweak.setYaxisLabel(ax, "Simulated\ Updraft\ velocity", "m\ s^{-1}")
                 
         fig.save()
@@ -718,11 +833,13 @@ def main():
     if True:
         figObject.figureBarSensitivyData()
     if True:
-        figObject.figureLeaveOneOut()
-    if True:
         figObject.figureUpdraftLinearFit()
     if True:
         figObject.figureErrorDistribution()
+    if True:
+        figObject.figureLeaveOneOut()
+    if True:
+        figObject.figureUpdraftLinearFitVSEMul()
     
         
 if __name__ == "__main__":
