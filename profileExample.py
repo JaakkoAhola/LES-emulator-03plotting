@@ -83,7 +83,7 @@ class MethodFigures:
         for ind in range(2):
             ax = fig.getAxes(ind)
             
-            self.soundIN.plot(ax=ax,x=variables[ind], y="height", color = colorList[ind], legend = False)
+            self.soundIN.plot(ax=ax,x=variables[ind], y="height", color = colorList[ind], legend = False, linewidth = 2)
             
             ax.set_ylim([0, maxheight])
             
