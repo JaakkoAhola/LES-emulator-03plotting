@@ -43,7 +43,7 @@ class MethodFigures:
         
         
        
-        fig = Figure(self.figurefolder,"figureProfileExample", figsize=[4.724409448818897, 3.574803149606299], ncols = 2, nrows = 1, wspace =0.15, bottom = 0.13, left=0.14)
+        fig = Figure(self.figurefolder,"figureProfileExample", figsize=[4.724409448818897, 4], ncols = 2, nrows = 1, wspace =0.15, bottom = 0.13, left=0.14)
         print(fig.getFigSize())
         colorList = [Colorful.getDistinctColorList("red"), Colorful.getDistinctColorList("blue")]
         variables = ["temperature", "water"]
