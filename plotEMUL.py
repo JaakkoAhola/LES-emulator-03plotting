@@ -196,7 +196,7 @@ class ManuscriptFigures:
         
         colorList, labelColors = ManuscriptFigures.getColorsForLabels(allLabels)
         
-        
+        legendLabelColors = {}
         for ind,trainingSet in enumerate(self.trainingSetList):
             ax = fig.getAxes(ind)
             
@@ -207,8 +207,15 @@ class ManuscriptFigures:
             margin_bottom = numpy.zeros(nroVariables)
             
             oneColorList = []
+            
             for variable in dataframe["designVariableNames"]:
-                oneColorList.append(labelColors[variable])
+                indColor = labelColors[variable]
+                oneColorList.append(indColor)
+                
+                mathlabel = dataframe.set_index("designVariableNames").loc[variable]["mathLabel"]
+                
+                if mathlabel not in legendLabelColors:
+                    legendLabelColors[mathlabel] = indColor
             
             for k,key in enumerate(["Interaction","MainEffect"]):
                 if key == "MainEffect":
@@ -229,15 +236,9 @@ class ManuscriptFigures:
         
         labelColors["Interaction"] = grey
         
-        mathLabelColors ={}
-        for ind,key in enumerate(dataframe["designVariableNames"]):
-            individualColor = labelColors[key]
-            individualLabel = dataframe.set_index("designVariableNames").loc[key]["mathLabel"]
-            mathLabelColors[individualLabel] = individualColor
         
         
-        
-        fig.getAxes(0).legend(handles=PlotTweak.getPatches(mathLabelColors),
+        fig.getAxes(0).legend(handles=PlotTweak.getPatches(legendLabelColors),
                                 title = "Global variance -based sensitivity for " + PlotTweak.getLatexLabel("w_{pos}", False),
                       loc=(-0.2,-2.6),
                       ncol = 4,
