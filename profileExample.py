@@ -112,6 +112,8 @@ class MethodFigures:
                 xPoint = (xmax-xmin)*0.2+xmin
                 yPoint = k_rate*(xPoint-tpot_pbl)
                 
+                PlotTweak.setAnnotation(ax, "(a) Temperature profile", xPosition = (xmax-xmin)*0.05 + xmin, yPosition = (ymax-ymin)*0.95+ymin)
+                
                 ax.axvline(tpot_pbl + tpot_inv , color = "k" , linestyle = "--" , ymax = (pblh + invThi)/ymax)
                 
                 # ax.arrow(xPoint, yPoint, tpot_pbl-xPoint, 0-yPoint,
@@ -161,6 +163,8 @@ class MethodFigures:
                 
                 ymin = ax.get_ylim()[0]
                 ymax = ax.get_ylim()[1]
+                
+                PlotTweak.setAnnotation(ax, "(b) Humidity profile", xPosition = (xmax-xmin)*0.17 + xmin, yPosition = (ymax-ymin)*0.95+ymin )
                 
                 ax.axvline(r_t - q_inv , color = "k" , linestyle = "--" , ymax = (pblh + invThi)/ymax)
                 
