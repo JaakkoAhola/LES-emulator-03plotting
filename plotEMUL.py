@@ -7,6 +7,7 @@ Created on Thu Jan 23 15:46:01 2020
 @licence: MIT licence Copyright
 """
 import matplotlib
+import math
 import numpy
 import os
 import pandas
@@ -40,9 +41,11 @@ class ManuscriptFigures:
         self.figurefolder = pathlib.Path(figurefolder)
         
         self.simulationCollection = {}
+        self.simulationDataFrame = {}
         for trainingSet in self.trainingSetList:
             simulationDataFrame = pandas.read_csv( self.emulatorPostprosDataRootFolder / ( trainingSet + ".csv" )  )
             simulationDataFrame = simulationDataFrame.set_index("ID", drop = False)
+            self.simulationDataFrame[trainingSet] = simulationDataFrame
             self.simulationCollection[trainingSet] = InputSimulation.getSimulationCollection( simulationDataFrame )
         
         self.annotationValues = ["(a) SB Night",
@@ -85,8 +88,96 @@ class ManuscriptFigures:
                 self.simulationCollection[trainingSet][emul].getPSDataset()
                 self.simulationCollection[trainingSet][emul].setTimeCoordToHours()
     
-    def getCloudTopOutliers(self):
-        self.cloudTopOutliers= {}
+    def getOutlierDataFromLESoutput(self):
+    
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            dataframe = self.simulationDataFrame[trainingSet]
+                
+            if ("lwpRelativeChange" in dataframe.keys().values) and ("cloudTopRelativeChange" in dataframe.keys().values):
+                break
+            
+            lwpRelativeChange = []
+            cloudTopRelativeChange = []
+            
+            for emulInd, emul in enumerate(self.simulationCollection[trainingSet]):
+                
+                
+                lwpStart = dataframe.loc[emul]["lwp"]
+                lwpEnd = self.simulationCollection[trainingSet][emul].getTSDataset()["lwp_bar"].values[-1]
+                
+                cloudTopStart = dataframe.loc[emul]["pblh_m"]
+                cloudTopEnd = self.simulationCollection[trainingSet][emul].getTSDataset()["zc"].values[-1]
+                
+                
+                lwpRelativeChange.append(lwpEnd / lwpStart)
+                cloudTopRelativeChange.append(cloudTopEnd / cloudTopStart)
+                
+            dataframe["lwpRelativeChange"] = lwpRelativeChange
+            dataframe["cloudTopRelativeChange"] = cloudTopRelativeChange
+            dataframe.to_csv( self.emulatorPostprosDataRootFolder / ( trainingSet + ".csv" )  )
+
+    def getAnomalies(self):
+        anomalyQuantile = 0.02
+        self.anomalies ={}
+        
+        for trainingSet in self.trainingSetList:
+            self.anomalies[trainingSet] = {}
+            
+            sVSpDataframe = self.simulatedVSPredictedCollection[trainingSet]
+            simulDataFrame = self.simulationDataFrame[trainingSet]
+            
+            anomalyLimitTpot_inv = sVSpDataframe["tpot_inv"].quantile(anomalyQuantile)
+            anomalyLimitQ_inv = sVSpDataframe["q_inv"].quantile(anomalyQuantile)
+            anomalyLimitCloudTopRelativeChange =  simulDataFrame["cloudTopRelativeChange"].quantile(1-anomalyQuantile)
+            anomalyLimitLWPRelativeChange = simulDataFrame["lwpRelativeChange"].quantile(1-anomalyQuantile)
+            print("anomalyLimitTpot_inv", anomalyLimitTpot_inv)
+            print("anomalyLimitQ_inv",anomalyLimitQ_inv)
+            print("anomalyLimitCloudTopRelativeChange", anomalyLimitCloudTopRelativeChange)
+            print("tpot_pbl", sVSpDataframe["tpot_pbl"].quantile(0.05), sVSpDataframe["tpot_pbl"].quantile(0.95))
+            
+            self.anomalies[trainingSet]["tpot_inv_low_tail"] =  list(map(int, sVSpDataframe["designCase"].where(sVSpDataframe["tpot_inv"] < anomalyLimitTpot_inv).dropna().values))
+            self.anomalies[trainingSet]["q_inv_low_tail"] = list(map(int, sVSpDataframe["designCase"].where(
+                                            sVSpDataframe["q_inv"] < anomalyLimitQ_inv ).dropna().values))
+            self.anomalies[trainingSet]["cloudTopRelativeChange_high_tail"] =  [ int(caseID[3:])-1 for caseID in list(simulDataFrame["ID"].where(
+                                            simulDataFrame["cloudTopRelativeChange"] > anomalyLimitCloudTopRelativeChange).dropna().values) ]
+            self.anomalies[trainingSet]["lwpRelativeChange_high_tail"] =  [ int(caseID[3:])-1 for caseID in list(simulDataFrame["ID"].where(
+                                            simulDataFrame["lwpRelativeChange"] > anomalyLimitLWPRelativeChange).dropna().values) ]
+            
+            self.anomalies[trainingSet]["tpot_high_tail"] =  ManuscriptFigures.getVariableAnomaly( sVSpDataframe, "tpot_pbl", limit =300, highTail = True)
+            self.anomalies[trainingSet]["tpot_low_tail"] =  ManuscriptFigures.getVariableAnomaly( sVSpDataframe, "tpot_pbl", limit =273, highTail = False)
+            
+            
+            
+            self.anomalies[trainingSet]["pbl_low_tail"] =  ManuscriptFigures.getVariableAnomaly( sVSpDataframe, "pblh", percentile =0.05, highTail = False)
+            self.anomalies[trainingSet]["pbl_high_tail"] = ManuscriptFigures.getVariableAnomaly( sVSpDataframe, "pblh", percentile =0.95, highTail = True)
+            
+            self.anomalies[trainingSet]["lwp_low_tail"] =  ManuscriptFigures.getVariableAnomaly( sVSpDataframe, "lwp", percentile =0.05, highTail = False)
+            self.anomalies[trainingSet]["lwp_high_tail"] =  ManuscriptFigures.getVariableAnomaly( sVSpDataframe, "lwp", percentile =0.95, highTail = True)
+            
+            if trainingSet[4:] == "Day":
+                print("Day cos_mu",sVSpDataframe["cos_mu"].quantile(0.05),  sVSpDataframe["cos_mu"].quantile(0.95))
+                self.anomalies[trainingSet]["cos_mu_low_quart"] =list(map(int, sVSpDataframe["designCase"].where(sVSpDataframe["cos_mu"] < math.cos(5*math.pi/12)).dropna().values))
+                self.anomalies[trainingSet]["cos_mu_high_quart"] =list(map(int, sVSpDataframe["designCase"].where(sVSpDataframe["cos_mu"] > math.cos(math.pi/12)).dropna().values))
+                
+            else:
+                self.anomalies[trainingSet]["cos_mu_low_quart"] = []
+                self.anomalies[trainingSet]["cos_mu_high_quart"] = []
+                
+            
+            print(" ")
+    def getVariableAnomaly(dataframe, variablename, indexName= "designCase", limit= None, percentile=None, highTail = True):
+        if limit is None:
+            limit = dataframe[variablename].quantile(percentile)
+            
+        if highTail:
+            factor = 1.
+        else:
+            factor = -1.
+            
+        return list(map(int, dataframe[indexName].where( factor * dataframe[variablename] > factor * limit ).dropna().values))
+            
+        
+                
         
     def getPairedColorList(numberOfElements):
         if numberOfElements %2 != 0:
@@ -290,6 +381,27 @@ class ManuscriptFigures:
             
             dataframe.plot.scatter(ax = ax, x="wpos_Simulated", y="wpos_Emulated",alpha=0.3)
             
+            dataframeAnomalies = dataframe.loc[dataframe["designCase"].isin(self.anomalies[trainingSet]["cloudTopRelativeChange_high_tail"])]
+            dataframeAnomalies.plot.scatter(ax = ax, x="wpos_Simulated", y="wpos_Emulated", color = "green", marker = "x", linewidth = 1)
+            
+            dataframeAnomalies = dataframe.loc[dataframe["designCase"].isin(self.anomalies[trainingSet]["lwpRelativeChange_high_tail"])]
+            dataframeAnomalies.plot.scatter(ax = ax, x="wpos_Simulated", y="wpos_Emulated", color = "blue", marker = "_", linewidth = 1)
+            
+            dataframeAnomalies = dataframe.loc[dataframe["designCase"].isin(self.anomalies[trainingSet]["tpot_inv_low_tail"])]
+            dataframeAnomalies.plot.scatter(ax = ax, x="wpos_Simulated", y="wpos_Emulated", color = "yellow", marker = "|", linewidth = 1)
+            
+            dataframeAnomalies = dataframe.loc[dataframe["designCase"].isin(self.anomalies[trainingSet]["pbl_low_tail"])]
+            dataframeAnomalies.plot.scatter(ax = ax, x="wpos_Simulated", y="wpos_Emulated", edgecolors = "yellow", marker = "o", linewidth = 0.5, color='none')
+            
+            dataframeAnomalies = dataframe.loc[dataframe["designCase"].isin(self.anomalies[trainingSet]["pbl_high_tail"])]
+            dataframeAnomalies.plot.scatter(ax = ax, x="wpos_Simulated", y="wpos_Emulated", edgecolors = "k", marker = "o", linewidth = 0.5, color='none')
+            
+            # dataframeAnomalies = dataframe.loc[dataframe["designCase"].isin(self.anomalies[trainingSet]["cos_mu_low_quart"])]
+            # dataframeAnomalies.plot.scatter(ax = ax, x="wpos_Simulated", y="wpos_Emulated", edgecolors = "yellow", marker = "o", linewidth = 0.5, color='none')
+            
+            # dataframeAnomalies = dataframe.loc[dataframe["designCase"].isin(self.anomalies[trainingSet]["cos_mu_high_quart"])]
+            # dataframeAnomalies.plot.scatter(ax = ax, x="wpos_Simulated", y="wpos_Emulated", edgecolors = "k", marker = "o", linewidth = 0.5, color='none')
+            
             coef = [slope, intercept]
             poly1d_fn = numpy.poly1d(coef)
             ax.plot(simulated.values, poly1d_fn(simulated.values), color = "k")
@@ -334,8 +446,7 @@ class ManuscriptFigures:
     def figureUpdraftLinearFit(self):
         
         
-        fig = Figure(self.figurefolder,"figureLinearFit", figsize = [4.724409448818897, 3], ncols = 2, nrows = 1, bottom = 0.25, hspace = 0.08, wspace=0.12, top=0.85)
-        print(fig.getFigSize())
+        fig = Figure(self.figurefolder,"figureLinearFit", figsize = [4.724409448818897, 3], ncols = 2, nrows = 1, bottom = 0.15, hspace = 0.08, wspace=0.12, top=0.80)
         xstart = -140
         xend = 50
         # xticks = numpy.arange(0, xend + 1, 10)
@@ -349,15 +460,27 @@ class ManuscriptFigures:
         
         # yShowList[-1] = False
         
+        color_obs = Colorful.getDistinctColorList("grey")
+        anomaly_Xlimit = [-50, -35]
+        anomaly_Ylimit = 0.25
+        
         for ind,trainingSet in enumerate(self.trainingSetList[:2]):
             ax = fig.getAxes(ind)
             
             dataframe = self.responseDataCollection[trainingSet]
             dataframe = dataframe[ dataframe["wpos"] != -999. ]
             
-            radiativeWarming  = dataframe["drflx"]
-            updraft =  dataframe["wpos"]
+            radiativeWarming  = dataframe["drflx"].values
+            updraft =  dataframe["wpos"].values
             
+            slope_obs = -0.44
+            intercept_obs = 22.30
+            error_obs = 13./100.
+            poly1d_Observation = numpy.poly1d(numpy.asarray([slope_obs,intercept_obs ])/100.) #?0.44 ×CTRC+
+            ax.plot(radiativeWarming, poly1d_Observation(radiativeWarming), color = color_obs)
+            ax.fill_between(sorted(radiativeWarming),
+                            poly1d_Observation(sorted(radiativeWarming)) - error_obs*numpy.ones(numpy.shape(radiativeWarming)), poly1d_Observation(sorted(radiativeWarming)) + error_obs*numpy.ones(numpy.shape(radiativeWarming)),
+                            alpha=0.2)
             
             slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(radiativeWarming, updraft)
             coef = [slope, intercept]
@@ -367,14 +490,47 @@ class ManuscriptFigures:
             fitColor = "k"
             dataframe.plot.scatter(ax = ax, x="drflx", y="wpos",alpha=0.3, color = dataColor)
             
+            tempAnomalies = [ k+1 for k in self.anomalies[trainingSet]["tpot_inv_low_tail"] ]
+            cloudTopAnomalies = [ k+1 for k in self.anomalies[trainingSet]["cloudTopRelativeChange_high_tail"] ]
+            lwpAnomalies = [ k+1 for k in self.anomalies[trainingSet]["lwpRelativeChange_high_tail"] ]
+            
+            tpotHighAnomalies = [ k+1 for k in self.anomalies[trainingSet]["tpot_high_tail"] ]
+            tpotLowAnomalies = [ k+1 for k in self.anomalies[trainingSet]["tpot_low_tail"] ]
+            
+            cosMuHighAnomalies = [ k+1 for k in self.anomalies[trainingSet]["cos_mu_high_quart"] ]
+            cosMuLowAnomalies = [ k+1 for k in self.anomalies[trainingSet]["cos_mu_low_quart"] ]
+            
+            
+            dataframeAnomalies = dataframe.loc[dataframe["i"].isin(cloudTopAnomalies)]
+            dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y="wpos", color = "green", marker = "x", linewidth = 1)
+            
+            dataframeAnomalies = dataframe.loc[dataframe["i"].isin(tempAnomalies)]
+            dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y="wpos", color = "yellow", marker = "|", linewidth = 1)
+            
+            dataframeAnomalies = dataframe.loc[dataframe["i"].isin(lwpAnomalies)]
+            dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y="wpos", color = "b", marker = "_", linewidth = 1)
+            
+            dataframeAnomalies = dataframe.loc[dataframe["i"].isin(tpotHighAnomalies)]
+            dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y="wpos", edgecolors = "k", marker = "o", linewidth = 0.5, color='none')
+            
+            dataframeAnomalies = dataframe.loc[dataframe["i"].isin(tpotLowAnomalies)]
+            dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y="wpos", edgecolors = "yellow", marker = "o", linewidth = 0.5, color='none')
+            
+            # dataframeAnomalies = dataframe.loc[dataframe["i"].isin(cosMuHighAnomalies)]
+            # dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y="wpos", edgecolors = "k", marker = "o", linewidth = 0.5, color='none')
+            
+            # dataframeAnomalies = dataframe.loc[dataframe["i"].isin(cosMuLowAnomalies)]
+            # dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y="wpos", edgecolors = "yellow", marker = "o", linewidth = 0.5, color='none')
+            
             poly1d_fn = numpy.poly1d(coef)
             
             linearFit = []
             for radWarmingValue in list(self.responseDataCollection[trainingSet]["drflx"]):
                 linearFit.append(poly1d_fn(radWarmingValue))
             
-            self.responseDataCollection[trainingSet]["linearFit"] =linearFit #dataframe.apply(lambda row: poly1d_fn(row.drflx.values), axis = 1)
-            ax.plot(radiativeWarming.values, poly1d_fn(radiativeWarming.values), color = fitColor)
+            self.responseDataCollection[trainingSet]["linearFit"] =linearFit #dataframe.apply(lambda row: poly1d_fn(row.drflx), axis = 1)
+            ax.plot(radiativeWarming, poly1d_fn(radiativeWarming), color = fitColor)
+            
             
             ax.set_xlim([xstart, xend])
             ax.set_ylim([ystart, yend])
@@ -382,7 +538,7 @@ class ManuscriptFigures:
             
             PlotTweak.setAnnotation(ax, self.annotationCollection[trainingSet],
                                     xPosition=PlotTweak.getXPosition(ax, 0.05), yPosition = PlotTweak.getYPosition(ax, 0.9))
-            print(trainingSet, slope, intercept, r_value, p_value, std_err)
+            # print(trainingSet, slope, intercept, r_value, p_value, std_err)
             # PlotTweak.setAnnotation(ax, ,
             #                         xPosition=0.5, yPosition=0.1, bbox_props = None)
             
@@ -397,12 +553,28 @@ class ManuscriptFigures:
             PlotTweak.setXTickSizes(ax, xShownLabelsBoolean)
             
             
+            # ax.axvline(anomaly_Xlimit[ind] , color = "k" , linestyle = "--" , ymax = anomaly_Ylimit)
+            # ax.axhline(anomaly_Ylimit , color = "k" , linestyle = "--" , xmax = anomaly_Xlimit[ind])
+            
             # ax.set_xticks(ticks)
             # ax.set_xticklabels(tickLabels)
             # PlotTweak.hideLabels(ax.xaxis, yShowList)
             
             if ind == 0:
-                PlotTweak.setArtist(ax, {"Simulated data": dataColor, "Fit" : "k"}, loc = (0.55, 1.05), ncol = 2)
+                collectionOfLabelsColors = {"Simulated data": dataColor, "Fit" : "k", "Observations" : color_obs}
+                legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
+                
+                legendLabelColors.append(matplotlib.lines.Line2D([], [], markerfacecolor='b', marker='_', markersize = 12, linestyle="-",
+                          label='LWP rel. change High tail'))
+                legendLabelColors.append(matplotlib.lines.Line2D([], [], color='k', marker='|', markersize = 12, linestyle="None",
+                          label='Temp. Inv. Low Tail'))
+                legendLabelColors.append(matplotlib.lines.Line2D([], [], color='green', marker='x', markersize = 12, linestyle="None",
+                          label='Cloud Top rel. change High Tail'))
+                legendLabelColors = list(numpy.asarray(legendLabelColors).reshape(2,3).T.flatten())
+                artist = ax.legend( handles=legendLabelColors, loc=(-0.1, 1.05), frameon = True, framealpha = 1.0, ncol = 3 )
+        
+                ax.add_artist(artist)
+                # PlotTweak.setArtist(ax, {"Simulated data": dataColor, "Fit" : "k", "Observations" : color_obs}, loc = (0.15, 1.05), ncol = 3)
             
             ax.text(-30, 0.75,
                 PlotTweak.getLatexLabel("y=a + b * x") + "\n" + \
@@ -461,7 +633,20 @@ class ManuscriptFigures:
             fitColor = "k"
             dataColor = Colorful.getDistinctColorList("red")
             
+            tempAnomalies = [ k+1 for k in self.anomalies[trainingSet]["tpot_inv_low_tail"] ]
+            cloudTopAnomalies = [ k+1 for k in self.anomalies[trainingSet]["cloudTopRelativeChange_high_tail"] ]
+            lwpAnomalies = [ k+1 for k in self.anomalies[trainingSet]["lwpRelativeChange_high_tail"] ]
+            
             dataframeFit.plot.scatter(ax=ax, x="wpos", y="linearFit", alpha = 0.3, color=dataColor)
+            
+            dataframeAnomalies = dataframeFit.loc[dataframeFit["i"].isin(cloudTopAnomalies)]
+            dataframeAnomalies.plot.scatter(ax = ax, x="wpos", y="linearFit", color = "green", marker = "x", linewidth = 1)
+            
+            dataframeAnomalies = dataframeFit.loc[dataframeFit["i"].isin(tempAnomalies)]
+            dataframeAnomalies.plot.scatter(ax = ax, x="wpos", y="linearFit", color = "k", marker = "|", linewidth = 1)
+            
+            dataframeAnomalies = dataframeFit.loc[dataframeFit["i"].isin(lwpAnomalies)]
+            dataframeAnomalies.plot.scatter(ax = ax, x="wpos", y="linearFit", color = "b", marker = "_", linewidth = 1)
         
             poly1d_fn = numpy.poly1d(coefFit)
             
@@ -552,7 +737,7 @@ class ManuscriptFigures:
             
             emulRMSE = sqrt(mean_squared_error(dataframe["wpos_Simulated"], dataframe["wpos_Emulated"]))
             
-            print(trainingSet, emulRMSE)
+            # print(trainingSet, emulRMSE)
             
             dataframe["absErrorEmul"].plot.hist(ax=ax, bins = 20, color = emulColor,  style='--', alpha = 0.5 )
             
@@ -629,8 +814,6 @@ class ManuscriptFigures:
                 PlotTweak.setArtist(ax, {"Updraft from emulator": emulColor, "Updraft from linear fit" : linFitColor}, loc = (0.07, 1.05), ncol = 2)
             
             #dataframe["emulRMSE"] = dataframe.apply(lambda col: sqrt(mean_squared_error(dataframe["wpos_Simulated"], dataframe["wpos_Emulated"])), axis = 0 )
-        print("xmin: {0}, xmax: {1}".format(mini, maxi))
-        print("ymaxi".format(ymaxi))
         
         fig.save()    
         
@@ -644,8 +827,6 @@ class ManuscriptFigures:
                   yPositionCorrection = 100, outlierParameter = 0.2):
         
         relativeChangeDict  = Data.emptyDictionaryWithKeys(trainingSetList)
-        print(" ")
-        print(figurename)
         # create figure object
         fig = Figure(figurefolder,figurename, ncols=2, nrows=2, sharex=True, sharey = True)
         # plot timeseries with unit conversion
@@ -687,7 +868,6 @@ class ManuscriptFigures:
                                                  alpha = 0.5,
                                                  zorder=zorderParam
                                                  )
-        print("minimi", mini, "maksimi",maks)
             
         for ind, case in enumerate(trainingSetList):
             PlotTweak.setAnnotation(fig.getAxes(True)[ind], annotationCollection[case], xPosition=100, yPosition=ymax-yPositionCorrection)
@@ -727,55 +907,6 @@ class ManuscriptFigures:
             simulationDataFrames = mergeDataFrameWithParam( simulationDataFrames, cloudTopParameters, "zcRel")
             cloudTopFig.save()    
             
-    def getCloudTopOutliers(self):
-        cloutTopOutliers = {}
-        for ind, case in enumerate(list(simulationDataFrames)):
-            cloudTopOutliers[case] =  simulationDataFrames[case].where( simulationDataFrames[case]["zcRel"] <  simulationDataFrames[case]["zcRel"] )
-        
-    
-        fig2 = Figure(figurefolder,"cloudtopOutliers", ncols=2, nrows=2, sharex=True, sharey = True)
-        # plot timeseries with unit conversion
-        cloudTopOutliersColors = Colorful.getIndyColorList(len(cloudTopOutliers))
-        for ind, case in enumerate(trainingSetList):
-            for emulInd, emul in enumerate(cloudTopOutliers):
-                try:
-                    simulation = simulationCollection[case][emul]
-                except KeyError:
-                    continue
-                dataset = simulation.getTSDataset()
-                muuttuja = dataset["zc"][1:] / ( simulationDataFrames[case].loc[emul]["pblh_m"])
-                
-                muuttuja.plot( ax = fig2.getAxes(True)[ind],
-                              color = cloudTopOutliersColors[emulInd],
-                              label =  simulationCollection[case][emul].getLabel() ) 
-                
-            
-        xmax = 3.5
-        ymax = 2.5
-        
-        for ind, case in enumerate(trainingSetList):
-            PlotTweak.setAnnotation(fig2.getAxes(True)[ind], annotationCollection[case], xPosition=1.5, yPosition=ymax-0.25)
-            PlotTweak.setXLim(fig2.getAxes(True)[ind],0,xmax)
-            PlotTweak.setYLim(fig2.getAxes(True)[ind],0,ymax)
-            
-            #fig2.getAxes(True)[ind].plot( [0,xmax], [0, ymax], 'k-', alpha=0.75, zorder=0)
-            
-            PlotTweak.useLegend(fig2.getAxes(True)[ind], loc = 'upper left')
-            PlotTweak.setXaxisLabel( fig2.getAxes(True)[ind], "", None, useBold=True)
-            PlotTweak.setYaxisLabel( fig2.getAxes(True)[ind], "", None, useBold=True)
-            Plot.getVerticalLine( fig2.getAxes(True)[ind], 1.5)
-        
-        
-        PlotTweak.setXaxisLabel( fig2.getAxes(True)[2], "Time", "h", useBold=True)
-        PlotTweak.setXaxisLabel( fig2.getAxes(True)[3], "Time", "h", useBold=True)
-        PlotTweak.setYaxisLabel( fig2.getAxes(True)[0], "Cloud top relative change", None, useBold=True)
-        PlotTweak.setYaxisLabel( fig2.getAxes(True)[2], "Cloud top relative change", None, useBold=True)
-        PlotTweak.setYaxisLabel( fig2.getAxes(True)[2], "Cloud top relative change", None, useBold=True)
-        PlotTweak.setYaxisLabel( fig2.getAxes(True)[2], "Cloud top relative change", None, useBold=True)
-        
-        
-        fig2.save()
-    
     def getLWPOutliers(self):
         for ind, case in enumerate(list(lwpOutliers)):
             lwpOutliers[case] = Data.getHighAndLowTail(lwpOutliers[case], 0.01)
@@ -830,6 +961,8 @@ def main():
     figObject.readSensitivityData()
     figObject.readSimulatedVSPredictedData()
     figObject.readResponseData()
+    figObject.getOutlierDataFromLESoutput()
+    figObject.getAnomalies()
     
     if True:
         figObject.figureBarSensitivyData()
