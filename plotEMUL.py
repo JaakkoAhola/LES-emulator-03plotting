@@ -173,7 +173,9 @@ class ManuscriptFigures:
                 
                 
                 lwpStart = dataframe.loc[emul]["lwp"]
-                lwpEnd = self.simulationCollection[trainingSet][emul].getTSDataset()["lwp_bar"].values[-1]
+                print(lwpStart)
+                lwpEnd = self.simulationCollection[trainingSet][emul].getTSDataset()["lwp_bar"].values[-1]*1000.
+                print(lwpEnd)
                 
                 cloudTopStart = dataframe.loc[emul]["pblh_m"]
                 cloudTopEnd = self.simulationCollection[trainingSet][emul].getTSDataset()["zc"].values[-1]
@@ -196,23 +198,39 @@ class ManuscriptFigures:
             sVSpDataframe = self.simulatedVSPredictedCollection[trainingSet]
             simulDataFrame = self.simulationDataFrame[trainingSet]
             
-            anomalyLimitTpot_inv = sVSpDataframe["tpot_inv"].quantile(anomalyQuantile)
+            useQuantile = False
+            if useQuantile:
+                self.anomalyLimitTpot_inv = sVSpDataframe["tpot_inv"].quantile(anomalyQuantile)
+                self.anomalyLimitCloudTopRelativeChange = simulDataFrame["cloudTopRelativeChange"].quantile(1-anomalyQuantile)
+                self.anomalyLimitLWPRelativeChange = simulDataFrame["lwpRelativeChange"].quantile(1-anomalyQuantile)
+                print("anomalyLimitTpot_inv", self.anomalyLimitTpot_inv)
+                print("anomalyLimitCloudTopRelativeChange", self.anomalyLimitCloudTopRelativeChange)
+                print("anomalyLimitLWPRelativeChange", self.anomalyLimitLWPRelativeChange)
+            else:
+                
+                self.anomalyLimitTpot_inv = 2.5
+                self.anomalyLimitCloudTopRelativeChange =  1.1
+                self.anomalyLimitLWPRelativeChange = 1.4
+            
             anomalyLimitQ_inv = sVSpDataframe["q_inv"].quantile(anomalyQuantile)
-            anomalyLimitCloudTopRelativeChange =  simulDataFrame["cloudTopRelativeChange"].quantile(1-anomalyQuantile)
-            anomalyLimitLWPRelativeChange = simulDataFrame["lwpRelativeChange"].quantile(1-anomalyQuantile)
-            print("anomalyLimitTpot_inv", anomalyLimitTpot_inv)
+            
+            
+            
+            
+            
             print("anomalyLimitQ_inv",anomalyLimitQ_inv)
-            print("anomalyLimitCloudTopRelativeChange", anomalyLimitCloudTopRelativeChange)
+            
+            
             print("tpot_pbl", sVSpDataframe["tpot_pbl"].quantile(0.05), sVSpDataframe["tpot_pbl"].quantile(0.95))
             
-            self.anomalies[trainingSet]["tpot_inv_low_tail"] = ManuscriptFigures.getVariableAnomaly( sVSpDataframe, "tpot_inv", limit = anomalyLimitTpot_inv, highTail=False)
+            self.anomalies[trainingSet]["tpot_inv_low_tail"] = ManuscriptFigures.getVariableAnomaly( sVSpDataframe, "tpot_inv", limit = self.anomalyLimitTpot_inv, highTail=False)
             self.anomalies[trainingSet]["q_inv_low_tail"] = ManuscriptFigures.getVariableAnomaly( sVSpDataframe, "q_inv", limit =  anomalyLimitQ_inv, highTail =False )
             
             self.anomalies[trainingSet]["cloudTopRelativeChange_high_tail"] =  [ int(caseID[3:])-1 for caseID in list(simulDataFrame["ID"].where(
-                                            simulDataFrame["cloudTopRelativeChange"] > anomalyLimitCloudTopRelativeChange).dropna().values) ]
+                                            simulDataFrame["cloudTopRelativeChange"] > self.anomalyLimitCloudTopRelativeChange).dropna().values) ]
             
             self.anomalies[trainingSet]["lwpRelativeChange_high_tail"] =  [ int(caseID[3:])-1 for caseID in list(simulDataFrame["ID"].where(
-                                            simulDataFrame["lwpRelativeChange"] > anomalyLimitLWPRelativeChange).dropna().values) ]
+                                            simulDataFrame["lwpRelativeChange"] > self.anomalyLimitLWPRelativeChange).dropna().values) ]
             
             self.anomalies[trainingSet]["tpot_high_tail"] =  ManuscriptFigures.getVariableAnomaly( sVSpDataframe, "tpot_pbl", limit =300, highTail = True)
             self.anomalies[trainingSet]["tpot_low_tail"] =  ManuscriptFigures.getVariableAnomaly( sVSpDataframe, "tpot_pbl", limit =273, highTail = False)
@@ -418,7 +436,7 @@ class ManuscriptFigures:
     def figureLeaveOneOut(self):
         
         
-        fig = Figure(self.figurefolder,"figureLeaveOneOut",  ncols = 2, nrows = 2, bottom = 0.15, hspace = 0.08, wspace=0.04)
+        fig = Figure(self.figurefolder,"figureLeaveOneOut", figsize = [4.724409448818897, 4],  ncols = 2, nrows = 2, bottom = 0.12, hspace = 0.08, wspace=0.04, top=0.88)
         end = 0.8
         ticks = numpy.arange(0, end + .01, 0.1)
         tickLabels = [f"{t:.1f}" for t in ticks]
@@ -498,6 +516,21 @@ class ManuscriptFigures:
             PlotTweak.setXaxisLabel(ax,"")
             PlotTweak.setYaxisLabel(ax,"")
             
+            if ind == 0:
+                legendLabelColors = []
+                
+                legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.cloudTopColor, marker='x', markersize = 12, linestyle='None',
+                          label='Cloud top rel. change >' + str(self.anomalyLimitCloudTopRelativeChange)))
+                legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.lwpColor, marker='_', markersize = 12, linestyle="None",
+                          label='LWP rel. change >' + str(self.anomalyLimitLWPRelativeChange)))
+                legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.tempColor, marker='|', markersize = 12, linestyle='None',
+                          label=r'$\Delta\Theta_{L} < $' + str(self.anomalyLimitTpot_inv)))
+                
+                
+                artist = ax.legend( handles=legendLabelColors, loc=(0.17, 1.05), frameon = True, framealpha = 1.0, ncol = 2 )
+        
+                ax.add_artist(artist)
+            
             if ind in [2,3]:
                 
                 
@@ -516,7 +549,7 @@ class ManuscriptFigures:
                 PlotTweak.hideYTickLabels(ax)
             
             if ind == 2:
-                ax.text(0.5,-0.25, PlotTweak.getUnitLabel("Simulated\ w_{pos}", "m\ s^{-1}"), size=8)
+                ax.text(0.5,-0.2, PlotTweak.getUnitLabel("Simulated\ w_{pos}", "m\ s^{-1}"), size=8)
             if ind == 0:
                 ax.text(-0.2,-0.5, PlotTweak.getUnitLabel("Emulated\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
                 
@@ -525,10 +558,9 @@ class ManuscriptFigures:
     def figureUpdraftLinearFit(self):
         
         
-        fig = Figure(self.figurefolder,"figureLinearFit", figsize = [4.724409448818897, 3], ncols = 2, nrows = 1, bottom = 0.15, hspace = 0.08, wspace=0.12, top=0.80)
+        fig = Figure(self.figurefolder,"figureLinearFit", figsize = [4.724409448818897, 5], ncols = 2, nrows = 2, bottom = 0.11, hspace = 0.08, wspace=0.12, top=0.86)
         xstart = -140
         xend = 50
-        # xticks = numpy.arange(0, xend + 1, 10)
         
         ystart = 0.0
         yend = 1.0
@@ -537,13 +569,9 @@ class ManuscriptFigures:
         
         yShowList = Data.cycleBoolean(len(yticks))
         
-        # yShowList[-1] = False
-        
         color_obs = Colorful.getDistinctColorList("grey")
-        anomaly_Xlimit = [-50, -35]
-        anomaly_Ylimit = 0.25
         
-        for ind,trainingSet in enumerate(self.trainingSetList[:2]):
+        for ind,trainingSet in enumerate(self.trainingSetList):
             ax = fig.getAxes(ind)
             
             dataframe = self.responseDataCollection[trainingSet]
@@ -616,11 +644,8 @@ class ManuscriptFigures:
             
             
             PlotTweak.setAnnotation(ax, self.annotationCollection[trainingSet],
-                                    xPosition=PlotTweak.getXPosition(ax, 0.05), yPosition = PlotTweak.getYPosition(ax, 0.9))
-            # print(trainingSet, slope, intercept, r_value, p_value, std_err)
-            # PlotTweak.setAnnotation(ax, ,
-            #                         xPosition=0.5, yPosition=0.1, bbox_props = None)
-            
+                                    xPosition=PlotTweak.getXPosition(ax, 0.02), yPosition = PlotTweak.getYPosition(ax, 0.94))
+
             PlotTweak.setXaxisLabel(ax,"")
             PlotTweak.setYaxisLabel(ax,"")
             
@@ -632,30 +657,22 @@ class ManuscriptFigures:
             PlotTweak.setXTickSizes(ax, xShownLabelsBoolean)
             
             
-            # ax.axvline(anomaly_Xlimit[ind] , color = "k" , linestyle = "--" , ymax = anomaly_Ylimit)
-            # ax.axhline(anomaly_Ylimit , color = "k" , linestyle = "--" , xmax = anomaly_Xlimit[ind])
-            
-            # ax.set_xticks(ticks)
-            # ax.set_xticklabels(tickLabels)
-            # PlotTweak.hideLabels(ax.xaxis, yShowList)
-            
             if ind == 0:
                 collectionOfLabelsColors = {"Simulated data": dataColor, "Fit" : "k", "Observations" : color_obs}
                 legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
                 
-                legendLabelColors.append(matplotlib.lines.Line2D([], [], color='green', marker='x', markersize = 12, linestyle='None',
-                          label='Cloud Top rel. change High Tail'))
-                legendLabelColors.append(matplotlib.lines.Line2D([], [], color='yellow', marker='|', markersize = 12, linestyle='None',
-                          label='Temp. Inv. Low Tail'))
-                legendLabelColors.append(matplotlib.lines.Line2D([], [], color='b', marker='_', markersize = 12, linestyle="None",
-                          label='LWP rel. change High tail'))
+                legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.cloudTopColor, marker='x', markersize = 12, linestyle='None',
+                          label='Cloud top rel. change >' + str(self.anomalyLimitCloudTopRelativeChange)))
+                legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.tempColor, marker='|', markersize = 12, linestyle='None',
+                          label=r'$\Delta\Theta_{L} < $' + str(self.anomalyLimitTpot_inv)))
+                legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.lwpColor, marker='_', markersize = 12, linestyle="None",
+                          label='LWP rel. change >' + str(self.anomalyLimitLWPRelativeChange)))
                 
                 
-                legendLabelColors = list(numpy.asarray(legendLabelColors).reshape(2,3).T.flatten())
-                artist = ax.legend( handles=legendLabelColors, loc=(-0.1, 1.05), frameon = True, framealpha = 1.0, ncol = 3 )
+                legendLabelColors = list(numpy.asarray(legendLabelColors).reshape(3,2).T.flatten())
+                artist = ax.legend( handles=legendLabelColors, loc=(0.17, 1.05), frameon = True, framealpha = 1.0, ncol = 2 )
         
                 ax.add_artist(artist)
-                # PlotTweak.setArtist(ax, {"Simulated data": dataColor, "Fit" : "k", "Observations" : color_obs}, loc = (0.15, 1.05), ncol = 3)
             
             ax.text(-30, 0.75,
                 PlotTweak.getLatexLabel("y=a + b * x") + "\n" + \
@@ -674,17 +691,18 @@ class ManuscriptFigures:
                 PlotTweak.hideYTickLabels(ax)
             
             if ind in [0,1]:
-                PlotTweak.setXaxisLabel(ax,"Cloud\ rad.\ warming", "W\ m^{-2}")
+                PlotTweak.hideXTickLabels(ax)
             if ind == 0:
-                ax.text(PlotTweak.getXPosition(ax, -0.27), PlotTweak.getYPosition(ax, 0.),
+                ax.text(PlotTweak.getXPosition(ax, -0.27), PlotTweak.getYPosition(ax, -0.5),
                         PlotTweak.getUnitLabel("Simulated\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
-                # PlotTweak.setYaxisLabel(ax, "Simulated\ Updraft\ velocity", "m\ s^{-1}")
+            if ind == 2:
+                ax.text(0.3,-0.25, PlotTweak.getUnitLabel("Cloud\ rad.\ warming", "W\ m^{-2}"), size=8)
                 
         fig.save()
         
     def figureUpdraftLinearFitVSEMul(self):
-        fig = Figure(self.figurefolder,"figureLinearFitComparison", figsize = [4.724409448818897, 3], 
-                     ncols = 2, nrows = 1, bottom = 0.25, hspace = 0.08, wspace=0.12, top=0.85)
+        fig = Figure(self.figurefolder,"figureLinearFitComparison", figsize = [4.724409448818897, 4.5], 
+                     ncols = 2, nrows = 2, bottom = 0.11, hspace = 0.08, wspace=0.12, top=0.86)
         # xticks = numpy.arange(0, xend + 1, 10)
         
         start = 0.0
@@ -696,7 +714,7 @@ class ManuscriptFigures:
         
         showList[-1] = False
         
-        for ind,trainingSet in enumerate(self.trainingSetList[:2]):
+        for ind,trainingSet in enumerate(self.trainingSetList):
             ax = fig.getAxes(ind)
             
             dataframeFit = self.responseDataCollection[trainingSet]
@@ -745,8 +763,6 @@ class ManuscriptFigures:
             
             PlotTweak.setAnnotation(ax, self.annotationCollection[trainingSet],
                                     xPosition=PlotTweak.getXPosition(ax, 0.05), yPosition = PlotTweak.getYPosition(ax, 0.9))
-            # PlotTweak.setAnnotation(ax, ,
-            #                         xPosition=0.5, yPosition=0.1, bbox_props = None)
             
             PlotTweak.setXaxisLabel(ax,"")
             PlotTweak.setYaxisLabel(ax,"")
@@ -760,14 +776,26 @@ class ManuscriptFigures:
             PlotTweak.hideLabels(ax.xaxis, showList)
             
             if ind == 0:
-                PlotTweak.setArtist(ax, {"Simulated data": dataColor, "Fit" : "k"}, loc = (0.55, 1.05), ncol = 2)
-            
-            # ax.text(-30, 0.75,
-            #     PlotTweak.getLatexLabel("y=a + b * x") + "\n" + \
-            #                              PlotTweak.getLatexLabel(f"a={interceptFit:.4f}") + "\n" + \
-            #                                  PlotTweak.getLatexLabel(f"b={slopeFit:.6f}") + "\n" + \
-            #                                PlotTweak.getLatexLabel(f"R^2={rSquared:Fit.2f}"), fontsize = 6)
-            
+                collectionOfLabelsColors = {"Simulated data": dataColor, "Fit" : "k"}
+                legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
+                
+                legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.cloudTopColor, marker='x', markersize = 12, linestyle='None',
+                          label='Cloud top rel. change >' + str(self.anomalyLimitCloudTopRelativeChange)))
+                legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.tempColor, marker='|', markersize = 12, linestyle='None',
+                          label=r'$\Delta\Theta_{L} < $' + str(self.anomalyLimitTpot_inv)))
+                legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.lwpColor, marker='_', markersize = 12, linestyle="None",
+                          label='LWP rel. change >' + str(self.anomalyLimitLWPRelativeChange)))
+                legendLabelColors.append(None)
+                
+                
+                legendLabelColors = list(numpy.asarray(legendLabelColors).reshape(3,2).T.flatten())
+                # print(legendLabelColors)
+                legendLabelColors.pop(-1)
+                # print(legendLabelColors)
+                artist = ax.legend( handles=legendLabelColors, loc=(0.17, 1.05), frameon = True, framealpha = 1.0, ncol = 2 )
+        
+                ax.add_artist(artist)
+                
             ax.set_yticks(ticks)
             ax.set_yticklabels(tickLabels)
             PlotTweak.setYTickSizes(ax, showList)
@@ -777,17 +805,13 @@ class ManuscriptFigures:
             
             if ind in [1,3]:
                 PlotTweak.hideYTickLabels(ax)
+            if ind in [0,1]:
+                PlotTweak.hideXTickLabels(ax)
             
+            if ind == 2:
+                ax.text(0.5,-.25, PlotTweak.getUnitLabel("Updraft\ from\ emulator", "m\ s^{-1}"), size=8)
             if ind == 0:
-                ax.text(0.5,-.3, PlotTweak.getUnitLabel("Updraft\ from\ emulator", "m\ s^{-1}"), size=8)
-            if ind == 0:
-                ax.text(-0.27,0.0, PlotTweak.getUnitLabel("Updraft\ from\ linear\ fit", "m\ s^{-1}"), size=8 , rotation =90)
-            # if ind in [0,1]:
-            #     PlotTweak.setXaxisLabel(ax,"Cloud\ rad.\ warming", "W\ m^{-2}")
-            # if ind == 0:
-            #     ax.text(PlotTweak.getXPosition(ax, -0.27), PlotTweak.getYPosition(ax, 0.),
-            #             PlotTweak.getUnitLabel("Simulated\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
-                # PlotTweak.setYaxisLabel(ax, "Simulated\ Updraft\ velocity", "m\ s^{-1}")
+                ax.text(PlotTweak.getXPosition(ax, -0.27), PlotTweak.getYPosition(ax, -0.4), PlotTweak.getUnitLabel("Updraft\ from\ linear\ fit", "m\ s^{-1}"), size=8 , rotation =90)
                 
         fig.save()
         
@@ -833,24 +857,19 @@ class ManuscriptFigures:
                 maxi = max(maxi,  dataframe["absErrorEmul"].min())
                 
             
-            if ind <2:
-                dataframe2 = self.responseDataCollection[trainingSet]
-                
-                
-                
-                
-                
-                
-                dataframe2["absErrorLinearFit"] = dataframe2.apply(lambda row: row.wpos - row.linearFit, axis = 1)
-                
-                dataframe2Filtered = dataframe2[ dataframe2["wpos"] != -999. ]
-                
-                linfitRMSE = sqrt(mean_squared_error(dataframe2Filtered["wpos"], dataframe2Filtered["linearFit"]))
-                
-                dataframe2Filtered["absErrorLinearFit"].plot.hist(ax=ax, bins = 20, color = linFitColor, style='--', alpha = 0.5 )
-                
-                mini = min(mini, dataframe2Filtered["absErrorLinearFit"].min())
-                maxi = max(maxi, dataframe2Filtered["absErrorLinearFit"].max())
+            dataframe2 = self.responseDataCollection[trainingSet]
+            
+            
+            dataframe2["absErrorLinearFit"] = dataframe2.apply(lambda row: row.wpos - row.linearFit, axis = 1)
+            
+            dataframe2Filtered = dataframe2[ dataframe2["wpos"] != -999. ]
+            
+            linfitRMSE = sqrt(mean_squared_error(dataframe2Filtered["wpos"], dataframe2Filtered["linearFit"]))
+            
+            dataframe2Filtered["absErrorLinearFit"].plot.hist(ax=ax, bins = 20, color = linFitColor, style='--', alpha = 0.5 )
+            
+            mini = min(mini, dataframe2Filtered["absErrorLinearFit"].min())
+            maxi = max(maxi, dataframe2Filtered["absErrorLinearFit"].max())
             
             if ymaxi is None:
                 ymaxi = ax.get_ylim()[1]
@@ -858,8 +877,7 @@ class ManuscriptFigures:
                 ymaxi = max(ymaxi, ax.get_ylim()[1])                
             
             stringi = f"RMS errors:\nEmulated: {emulRMSE:.4f}"
-            if ind <2:
-                stringi = stringi + f"\nLinear Fit: {linfitRMSE:.4f}"
+            stringi = stringi + f"\nLinear Fit: {linfitRMSE:.4f}"
             PlotTweak.setAnnotation(ax, stringi,
                                     xPosition=-0.39, yPosition=60, bbox_props = None)
             
