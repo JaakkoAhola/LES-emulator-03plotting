@@ -89,7 +89,7 @@ class MethodFigures:
             
             Plot.getHorizontalLine(ax, pblh)
             if ind == 0:
-                PlotTweak.setXaxisLabel(ax,"\Theta_{L}", "K")
+                PlotTweak.setXaxisLabel(ax,"\\theta_{L}", "K")
                 PlotTweak.setYaxisLabel(ax,"Altitude", "m")
 
                 

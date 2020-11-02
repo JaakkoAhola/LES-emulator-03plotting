@@ -59,6 +59,8 @@ class ManuscriptFigures:
         self.lwpColor = Colorful.getDistinctColorList("blue")
         self.tempColor = Colorful.getDistinctColorList("yellow")
         
+        self.bootStrapSampleSize = 100
+        self.bootStrapNumberOfSamples = 10000
     def readSimulatedVSPredictedData(self):
         self.simulatedVSPredictedCollection = {}
         for trainingSet in self.trainingSetList:
@@ -155,19 +157,37 @@ class ManuscriptFigures:
             
             
                 
-                
-                    
+    def getBootstrapLinRegress(self, dataframe, xName, yName):
+        bootStrapRSquared = numpy.zeros(self.bootStrapNumberOfSamples)            
+        for state in range(self.bootStrapNumberOfSamples):
+            dataframeSample = dataframe.sample( n=self.bootStrapSampleSize, random_state=state )
+            slopeSample, interceptSample, r_valueSample, p_valueSample, std_errSample = scipy.stats.linregress(dataframeSample[xName], dataframeSample[yName])            
+            bootStrapRSquared[state] = numpy.power(r_valueSample,2)
+        
+        return numpy.mean(bootStrapRSquared), numpy.std(bootStrapRSquared)
+    
+    def getBootstrapMeanAverage(self, dataframe, xName, yName):
+        meanAbsErrorList = numpy.zeros(self.bootStrapNumberOfSamples)            
+        for state in range(self.bootStrapNumberOfSamples):
+            dataframeSample = dataframe.sample( n=self.bootStrapSampleSize, random_state=state )
+            meanAbsError = numpy.mean(numpy.abs( dataframeSample[xName] - dataframeSample[yName] ) )
+            meanAbsErrorList[state] = meanAbsError
+        
+        return numpy.mean(meanAbsErrorList), numpy.std(meanAbsErrorList)
     
     def getOutlierDataFromLESoutput(self):
     
         for ind, trainingSet in enumerate(self.trainingSetList):
             dataframe = self.simulationDataFrame[trainingSet]
                 
-            if ("lwpRelativeChange" in dataframe.keys().values) and ("cloudTopRelativeChange" in dataframe.keys().values):
+            if ("lwpRelativeChange" in dataframe.keys().values) \
+                and ("cloudTopRelativeChange" in dataframe.keys().values)\
+                    and ("lwpEnd" in dataframe.keys().values):
                 break
             
             lwpRelativeChange = []
             cloudTopRelativeChange = []
+            lwpEndValue = []
             
             for emulInd, emul in enumerate(self.simulationCollection[trainingSet]):
                 
@@ -183,9 +203,11 @@ class ManuscriptFigures:
                 
                 lwpRelativeChange.append(lwpEnd / lwpStart)
                 cloudTopRelativeChange.append(cloudTopEnd / cloudTopStart)
+                lwpEndValue.append(lwpEnd)
                 
             dataframe["lwpRelativeChange"] = lwpRelativeChange
             dataframe["cloudTopRelativeChange"] = cloudTopRelativeChange
+            dataframe["lwpEndValue"] = lwpEndValue
             dataframe.to_csv( self.emulatorPostprosDataRootFolder / ( trainingSet + ".csv" )  )
 
     def getAnomalies(self):
@@ -453,28 +475,20 @@ class ManuscriptFigures:
             simulated = dataframe["wpos_Simulated"]
             emulated  = dataframe["wpos_Emulated"]
             
-            # if ind < 2:
-            #     dataframeFit = self.responseDataCollection[trainingSet]
-            #     simulatedFit = dataframeFit["wpos"]
-            #     fittedFit = dataframeFit["linearFit"]
-                
-            #     slopeFit, interceptFit, r_valueFit, p_valueFit, std_errFit = scipy.stats.linregress(simulatedFit, fittedFit)
-                
-            #     rSquaredFit = numpy.power(r_valueFit,2)
-                
-            #     coefFit = [slopeFit, interceptFit]
-                
-            #     dataframeFit.plot.scatter(ax=ax, x="wpos", y="linearFit", alpha = 0.3, color=Colorful.getDistinctColorList("red"))
             
-            #     poly1d_fn = numpy.poly1d(coefFit)
-            #     ax.plot(simulatedFit.values, poly1d_fn(simulatedFit.values), color = "grey")
-            #     labelFit= f"R^2={rSquaredFit:.2f}"
-            # else:
-            #     labelFit = ""
             
             slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(simulated, emulated)
             
             rSquared = numpy.power(r_value, 2)
+
+            # #########################
+            # bootStrapMean, bootStrapStd = self.getBootstrapMeanAverage(dataframe, "wpos_Simulated", "wpos_Emulated")
+            
+            print(" ")
+            print("Leave-one-out")
+            print(trainingSet, "mean absolute error", numpy.mean(numpy.abs(simulated-emulated)))
+            print( "bootstrap", "mean", bootStrapMean, "std", bootStrapStd )
+            ###################
             
             dataframe.plot.scatter(ax = ax, x="wpos_Simulated", y="wpos_Emulated",alpha=0.3)
             
@@ -524,7 +538,7 @@ class ManuscriptFigures:
                 legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.lwpColor, marker='_', markersize = 12, linestyle="None",
                           label='LWP rel. change >' + str(self.anomalyLimitLWPRelativeChange)))
                 legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.tempColor, marker='|', markersize = 12, linestyle='None',
-                          label=r'$\Delta\Theta_{L} < $' + str(self.anomalyLimitTpot_inv)))
+                          label=r"$\Delta {\theta_{L}} < $" + str(self.anomalyLimitTpot_inv)))
                 
                 
                 artist = ax.legend( handles=legendLabelColors, loc=(0.17, 1.05), frameon = True, framealpha = 1.0, ncol = 2 )
@@ -576,6 +590,8 @@ class ManuscriptFigures:
             
             dataframe = self.responseDataCollection[trainingSet]
             dataframe = dataframe[ dataframe["wpos"] != -999. ]
+            dataframe = dataframe[ dataframe["prcp"] < 1e-6 ]
+            
             
             radiativeWarming  = dataframe["drflx"].values
             updraft =  dataframe["wpos"].values
@@ -638,7 +654,7 @@ class ManuscriptFigures:
             self.responseDataCollection[trainingSet]["linearFit"] =linearFit #dataframe.apply(lambda row: poly1d_fn(row.drflx), axis = 1)
             ax.plot(radiativeWarming, poly1d_fn(radiativeWarming), color = fitColor)
             
-            
+            self.responseDataCollection[trainingSet].to_csv("/home/aholaj/Data/EmulatorManuscriptData/Datasets/" + trainingSet + "_fit.csv")
             ax.set_xlim([xstart, xend])
             ax.set_ylim([ystart, yend])
             
@@ -664,7 +680,7 @@ class ManuscriptFigures:
                 legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.cloudTopColor, marker='x', markersize = 12, linestyle='None',
                           label='Cloud top rel. change >' + str(self.anomalyLimitCloudTopRelativeChange)))
                 legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.tempColor, marker='|', markersize = 12, linestyle='None',
-                          label=r'$\Delta\Theta_{L} < $' + str(self.anomalyLimitTpot_inv)))
+                          label=r"$\Delta {\theta_{L}} < $" + str(self.anomalyLimitTpot_inv)))
                 legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.lwpColor, marker='_', markersize = 12, linestyle="None",
                           label='LWP rel. change >' + str(self.anomalyLimitLWPRelativeChange)))
                 
@@ -726,6 +742,16 @@ class ManuscriptFigures:
             
             rSquaredFit = numpy.power(r_valueFit,2)
             
+            ###########################
+            # bootStrapMean, bootStrapStd = self.getBootstrapMeanAverage(dataframeFit, "wpos", "linearFit")
+          
+            
+            print(" ")
+            print("Linear-fit vs emulator")
+            print(trainingSet, "mean absolute error", numpy.mean(numpy.abs(simulatedFit-fittedFit)))
+            print( "bootstrap", "mean", bootStrapMean, "std", bootStrapStd )
+            ######################
+            
             coefFit = [slopeFit, interceptFit]
             
             
@@ -782,7 +808,7 @@ class ManuscriptFigures:
                 legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.cloudTopColor, marker='x', markersize = 12, linestyle='None',
                           label='Cloud top rel. change >' + str(self.anomalyLimitCloudTopRelativeChange)))
                 legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.tempColor, marker='|', markersize = 12, linestyle='None',
-                          label=r'$\Delta\Theta_{L} < $' + str(self.anomalyLimitTpot_inv)))
+                          label=r"$\Delta {\theta_{L}} < $"+ str(self.anomalyLimitTpot_inv)))
                 legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.lwpColor, marker='_', markersize = 12, linestyle="None",
                           label='LWP rel. change >' + str(self.anomalyLimitLWPRelativeChange)))
                 legendLabelColors.append(None)
