@@ -65,6 +65,11 @@ class ManuscriptFigures:
         self.lwpColor = Colorful.getDistinctColorList("blue")
         self.tempColor = Colorful.getDistinctColorList("yellow")
         
+        self.observationParameters = {}
+        self.observationParameters["slope"] = -0.44/100.
+        self.observationParameters["intercept"] = 22.30/100.
+        self.observationParameters["error"] = 13./100.
+        
         
         
         self._initReadCompleteData()
@@ -86,7 +91,7 @@ class ManuscriptFigures:
         self.completeDataFrameFiltered = {}
         for trainingSet in self.trainingSetList:
             dataframe = self.completeDataFrame[trainingSet]
-            dataframe = dataframe.loc[ dataframe[self.responseVariable ] != self.filterValue ]
+            dataframe = dataframe.loc[ ~( numpy.isclose( dataframe[self.responseVariable ], self.filterValue, atol = 1)) ]
             self.completeDataFrameFiltered[trainingSet] = dataframe
 
     def _initReadSensitivityData(self):
@@ -286,10 +291,138 @@ class ManuscriptFigures:
             if ind == 0:
                 ax.text(-0.2,-0.5, PlotTweak.getUnitLabel("Emulated\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
                 
+    def analyseLinearFit(self):
+        condition = {}
+        updraftVariableName = self.responseVariable
+        
+        data = {}
+        from scipy import stats
+            
+        variables = ["q_inv", "tpot_inv", "lwp", "tpot_pbl", "pblh", "cos_mu", "pblh_m", "prcp", "wpos", "w2pos", "drflx", "lwpEndValue", "lwpRelativeChange", "cfracEndValue", "cloudTopRelativeChange"]
+        
+        for column in variables:
+            data[column + "_Inside_min"] = []
+            data[column + "_Inside_max"] = []
+            data[column + "_Outlier_min"] = []
+            data[column + "_Outlier_max"] = []
+            
+            
+        for ind,trainingSet in enumerate(self.trainingSetList):
+            dataframe = self.completeDataFrameFiltered[trainingSet]
+            
+            slope, intercept, r_value, p_value, std_err = stats.linregress(dataframe["drflx"], dataframe["w2pos"])
+
+            rSquared = numpy.power(r_value, 2)
+            
+            
+            
+            condition["notMatchObservation"] = ~ ( (dataframe[updraftVariableName] > dataframe["drflx"]*self.observationParameters["slope"]+ self.observationParameters["intercept"]-self.observationParameters["error"]) & (dataframe[updraftVariableName] < dataframe["drflx"]*self.observationParameters["slope"]+ self.observationParameters["intercept"]+self.observationParameters["error"]))
+            
+            dataFrameInside = dataframe[ ~condition["notMatchObservation"]]
+            
+            slopeInside, interceptInside, r_valueInside, p_valueInside, std_errInside = stats.linregress(dataFrameInside["drflx"], dataFrameInside["w2pos"])
+
+            rSquaredInside = numpy.power(r_valueInside, 2)
+            
+            print(f"{trainingSet}, all R^2: {rSquared:.2f}, #: {dataframe.shape[0]}; inside R^2: {rSquaredInside:.2f} #: {dataFrameInside.shape[0]}")
+            
+            for column in variables:
+                
+                try:
+                    minimiOutlier = float(dataframe.loc[ condition["notMatchObservation"] ][column].min())
+                except (TypeError, ValueError, KeyError):
+                    minimiOutlier = -8888.
+                try:
+                    maksimiOutlier = float(dataframe.loc[ condition["notMatchObservation"] ][column].max())
+                except (TypeError, ValueError, KeyError):
+                    maksimiOutlier = -8888.
+                
+                try:
+                    minimiInside = float(dataframe.loc[ ~ condition["notMatchObservation"] ][column].min())
+                except (TypeError, ValueError, KeyError):
+                    minimiInside = -8888.
+                try:
+                    maksimiInside = float(dataframe.loc[~ condition["notMatchObservation"] ][column].max())
+                except (TypeError, ValueError, KeyError):
+                    maksimiInside = -8888.
+                
+                data[ column + "_Inside_min"].append(minimiInside)
+                data[ column + "_Inside_max"].append(maksimiInside)
+                
+                data[ column + "_Outlier_min"].append(minimiOutlier)
+                data[ column + "_Outlier_max"].append(maksimiOutlier)
+                
+                if minimiOutlier < minimiInside:
+                    print(f"{trainingSet} {column} minimi smaller outside")
+                if maksimiOutlier > maksimiInside:
+                    print(f"{trainingSet} {column} maksimi greater outside")
+                
+                
+                # print(f"{trainingSet:11}{column:33} Inside: {minimiInside:.2f}{maksimiInside:.2f} Outlier: {minimiOutlier:.2f}{maksimiOutlier:.2f}")
+        df = pandas.DataFrame(data, index = self.trainingSetList)
+        
+        df.to_csv("/home/aholaj/Data/EmulatorManuscriptDataW2Pos/analyseLinearfit.csv")
+                    
+    def analyseLinearFitPercentile(self):
+        condition = {}
+        updraftVariableName = self.responseVariable
+        
+        data = {}
+        from scipy import stats
+            
+        variables = ["q_inv", "tpot_inv", "lwp", "tpot_pbl", "pblh", "cos_mu", "pblh_m", "prcp", "wpos", "w2pos", "drflx", "lwpEndValue", "lwpRelativeChange", "cfracEndValue", "cloudTopRelativeChange"]
+        tailPercentile = 0.05
+        for column in variables:
+            data[column + "_Inside_low_tail"] = []
+            data[column + "_Inside_high_tail"] = []
+            data[column + "_Outlier_low_tail"] = []
+            data[column + "_Outlier_high_tail"] = []
+            
+        print("Percentile")
+        for ind,trainingSet in enumerate(self.trainingSetList):
+            dataframe = self.completeDataFrameFiltered[trainingSet]
+            condition["notMatchObservation"] = ~ ( (dataframe[updraftVariableName] > dataframe["drflx"]*self.observationParameters["slope"]+ self.observationParameters["intercept"]-self.observationParameters["error"]) & (dataframe[updraftVariableName] < dataframe["drflx"]*self.observationParameters["slope"]+ self.observationParameters["intercept"]+self.observationParameters["error"]))
+            for column in variables:
+                
+                try:
+                    minimiOutlier = float(dataframe.loc[ condition["notMatchObservation"] ][column].quantile( tailPercentile ))
+                except (TypeError, ValueError, KeyError):
+                    minimiOutlier = -8888.
+                try:
+                    maksimiOutlier = float(dataframe.loc[ condition["notMatchObservation"] ][column].quantile(1- tailPercentile ))
+                except (TypeError, ValueError, KeyError):
+                    maksimiOutlier = -8888.
+                
+                try:
+                    minimiInside = float(dataframe.loc[ ~ condition["notMatchObservation"] ][column].quantile( tailPercentile ))
+                except (TypeError, ValueError, KeyError):
+                    minimiInside = -8888.
+                try:
+                    maksimiInside = float(dataframe.loc[~ condition["notMatchObservation"] ][column].quantile(1- tailPercentile ))
+                except (TypeError, ValueError, KeyError):
+                    maksimiInside = -8888.
+                
+                data[ column + "_Inside_low_tail"].append(minimiInside)
+                data[ column + "_Inside_high_tail"].append(maksimiInside)
+                
+                data[ column + "_Outlier_low_tail"].append(minimiOutlier)
+                data[ column + "_Outlier_high_tail"].append(maksimiOutlier)
+                
+                if minimiOutlier < minimiInside:
+                    print(f"{trainingSet} {column} low tail smaller outside")
+                if maksimiOutlier > maksimiInside:
+                    print(f"{trainingSet} {column} high tail greater outside")
+                
+                
+                # print(f"{trainingSet:11}{column:33} Inside: {minimiInside:.2f}{maksimiInside:.2f} Outlier: {minimiOutlier:.2f}{maksimiOutlier:.2f}")
+        df = pandas.DataFrame(data, index = self.trainingSetList)
+        
+        df.to_csv("/home/aholaj/Data/EmulatorManuscriptDataW2Pos/analyseLinearfitPercentile.csv")
+                
     def figureUpdraftLinearFit(self):
         
         
-        self.figures["figureLinearFit"] = Figure(self.figurefolder,"figureLinearFitCFRAC0.3_", figsize = [4.724409448818897, 6], ncols = 2, nrows = 2, bottom = 0.11, hspace = 0.08, wspace=0.12, top=0.8)
+        self.figures["figureLinearFit"] = Figure(self.figurefolder,"figureLinearFitIterated", figsize = [4.724409448818897, 6], ncols = 2, nrows = 2, bottom = 0.11, hspace = 0.08, wspace=0.12, top=0.8)
         fig = self.figures["figureLinearFit"]
         
         xstart = -140
@@ -311,10 +444,6 @@ class ManuscriptFigures:
             
             updraftVariableName = self.responseVariable
             
-            slope_obs = -0.44
-            intercept_obs = 22.30
-            error_obs = 13./100.
-            
             # condition =  {}
             # condition["tpot_inv"] = dataframe["tpot_inv"] > 5
             # condition["lwpEndValue"] = dataframe["lwpEndValue"] > 10.
@@ -322,23 +451,26 @@ class ManuscriptFigures:
             # condition["prcp"] =  dataframe["prcp"] < 1e-6
             
             condition =  {}
-            condition["tpot_inv"] = ~ (dataframe["tpot_inv"] > 2.5)
-            condition["lwpEndValue"] = ~ (dataframe["lwpEndValue"] > 10.)
-            condition["cfracEndValue"] = ~ (dataframe["cfracEndValue"] > 0.3)
-            condition["prcp"] = ~ (dataframe["prcp"] > 1e-6)
-            condition["notMatchObservation"] = ~ (dataframe[updraftVariableName] > dataframe["drflx"]*slope_obs+ intercept_obs-error_obs & dataframe[updraftVariableName] < dataframe["drflx"]*slope_obs+ intercept_obs+error_obs)
-            # dataframe["linearFitIndexTesti"] = Data.getAllConditions(condition)
+            # condition["tpot_inv"] = (dataframe["tpot_inv"] < 2.23)
+            # condition["lwpEndValue"] =  (dataframe["lwpEndValue"] < 1.)
+            condition["cfracEndValue"] = (dataframe["cfracEndValue"] < 0.61)
+            # condition["prcp"] = (dataframe["prcp"] > 6e-6) #BAD CONDITION
             
-        
+            condition["cloudTopRelativeChange"] = (dataframe["cloudTopRelativeChange"] > 1.1)
+            # condition["lwpRelativeChange"] = (dataframe["lwpRelativeChange"] < 0.03)
+            #condition["notMatchObservation"] = ~ ( (dataframe[updraftVariableName] > dataframe["drflx"]*self.observationParameters["slope"]+ self.observationParameters["intercept"]-self.observationParameters["error"]) & (dataframe[updraftVariableName] < dataframe["drflx"]*self.observationParameters["slope"]+ self.observationParameters["intercept"]+self.observationParameters["error"]))
+            allConditions = Data.getNANDConditions(condition)
+            # print(allConditions)
+            dataframe = dataframe[ allConditions ]
             
             radiativeWarming  = dataframe["drflx"].values
             updraft =  dataframe[updraftVariableName].values
             
             
-            poly1d_Observation = numpy.poly1d(numpy.asarray([slope_obs,intercept_obs ])/100.) #?0.44 ×CTRC+
+            poly1d_Observation = numpy.poly1d(numpy.asarray([self.observationParameters["slope"],self.observationParameters["intercept"] ])) #?0.44 ×CTRC+
             ax.plot(radiativeWarming, poly1d_Observation(radiativeWarming), color = color_obs)
             ax.fill_between(sorted(radiativeWarming),
-                            poly1d_Observation(sorted(radiativeWarming)) - error_obs*numpy.ones(numpy.shape(radiativeWarming)), poly1d_Observation(sorted(radiativeWarming)) + error_obs*numpy.ones(numpy.shape(radiativeWarming)),
+                            poly1d_Observation(sorted(radiativeWarming)) - self.observationParameters["error"]*numpy.ones(numpy.shape(radiativeWarming)), poly1d_Observation(sorted(radiativeWarming)) + self.observationParameters["error"]*numpy.ones(numpy.shape(radiativeWarming)),
                             alpha=0.2)
             
             slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(radiativeWarming, updraft)
@@ -372,29 +504,31 @@ class ManuscriptFigures:
                 dataframeAnomalies = dataframe.loc[ condition["prcp"] ]
                 dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = anomalyColors["prcp"])
             
-            # if True:
+            if False:
                 
-            # anomalyColors["2Conditions"] = "#FF00FF"
-            # dataframeAnomalies = dataframe.loc[ Data.getNLengthSubsetConditions(condition,2)  ]
-            # dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = anomalyColors["2Conditions"] )
+                anomalyColors["2Conditions"] = "#FF00FF"
+                dataframeAnomalies = dataframeAnomalies = dataframe.loc[ Data.getNLengthSubsetConditions(condition,2)  ]
+                dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = anomalyColors["2Conditions"] )
+                
+                # anomalyColors["3Conditions"] = "#00FF00"
+                # dataframeAnomalies = dataframe.loc[ Data.getNLengthSubsetConditions(condition,3)  ]
+                # dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = anomalyColors["3Conditions"])
+                
+                anomalyColors["allConditions"] = "black"
+                dataframeAnomalies = dataframe.loc[ allConditions  ]
+                dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = anomalyColors["allConditions"])
             
-            # anomalyColors["3Conditions"] = "#00FF00"
-            # dataframeAnomalies = dataframe.loc[ Data.getNLengthSubsetConditions(condition,3)  ]
-            # dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = anomalyColors["3Conditions"])
             
-            # anomalyColors["allConditions"] = "black"
-            # dataframeAnomalies = dataframe.loc[ Data.getAllConditions(condition)  ]
-            # dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = anomalyColors["allConditions"])
-            
-            
-            dataframeAnomalies = dataframe.loc[dataframe["cloudTopRelativeChange_high_tail"]]
+            # dataframeAnomalies = dataframe.loc[dataframe["cloudTopRelativeChange_high_tail"]]
+            dataframeAnomalies = dataframe.loc[ condition["cloudTopRelativeChange"]]
             dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = self.cloudTopColor, marker = "x", linewidth = 1)
             
-            dataframeAnomalies = dataframe.loc[dataframe["lwpRelativeChange_high_tail"]]
-            dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = self.lwpColor, marker = "_", linewidth = 1)
+            # dataframeAnomalies = dataframe.loc[dataframe["lwpRelativeChange_high_tail"]]
+            # dataframeAnomalies = dataframe.loc[ condition["lwpRelativeChange"]]
+            # dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = self.lwpColor, marker = "_", linewidth = 1)
             
-            dataframeAnomalies = dataframe.loc[dataframe["tpot_inv_low_tail"]]
-            dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = self.tempColor, marker = "|", linewidth = 1)
+            # dataframeAnomalies = dataframe.loc[dataframe["tpot_inv_low_tail"]]
+            # dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = self.tempColor, marker = "|", linewidth = 1)
             
             poly1d_fn = numpy.poly1d(coef)
             
@@ -700,7 +834,7 @@ class ManuscriptFigures:
 def main():
     
     figObject = ManuscriptFigures("/home/aholaj/Data/EmulatorManuscriptDataW2Pos", 
-                                  "/home/aholaj/Data/EmulatorManuscriptDataW2Pos/figures/anomalies",
+                                  "/home/aholaj/Data/EmulatorManuscriptDataW2Pos/figures/Filter2",
                                   "w2pos")
     
     if False:
@@ -719,6 +853,9 @@ def main():
         figObject.figureWposVSWposWeighted()
     
     figObject.finalise()
+    
+    # figObject.analyseLinearFitPercentile()
+    # figObject.analyseLinearFit()
         
 if __name__ == "__main__":
     start = time.time()
