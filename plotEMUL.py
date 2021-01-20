@@ -76,8 +76,6 @@ class ManuscriptFigures:
 
         self._filterCompleteData()
 
-        self._initReadSensitivityData()
-
         self._initReadStats()
 
         self._initReadLimits()
@@ -94,7 +92,7 @@ class ManuscriptFigures:
             dataframe = dataframe.loc[ ~( numpy.isclose( dataframe[self.responseVariable ], self.filterValue, atol = 1)) ]
             self.completeDataFrameFiltered[trainingSet] = dataframe
 
-    def _initReadSensitivityData(self):
+    def initReadSensitivityData(self):
         self.sensitivityDataCollection = {}
         for trainingSet in self.trainingSetList:
             self.sensitivityDataCollection[trainingSet] = pandas.read_csv( self.emulatorPostprosDataRootFolder / trainingSet / ( trainingSet + "_sensitivityAnalysis.csv" ), index_col = 0 )
@@ -539,7 +537,6 @@ class ManuscriptFigures:
             self.completeDataFrame[trainingSet][self.linearFitVariable] = linearFit
             ax.plot(radiativeWarming, poly1d_fn(radiativeWarming), color = fitColor)
 
-            self.completeDataFrame[trainingSet].to_csv("/home/aholaj/Data/EmulatorManuscriptData/Datasets/" + trainingSet + "_fit.csv")
             ax.set_xlim([xstart, xend])
             ax.set_ylim([ystart, yend])
 
@@ -838,10 +835,11 @@ def main():
                                   "w2pos")
 
     if False:
+        figObject.initReadSensitivityData()
         figObject.figureBarSensitivyData()
-    if False:
-        figObject.figureLeaveOneOut()
     if True:
+        figObject.figureLeaveOneOut()
+    if False:
         figObject.figureUpdraftLinearFit()
     if False:
         figObject.figureUpdraftLinearFitVSEMul()
