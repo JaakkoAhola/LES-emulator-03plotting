@@ -28,29 +28,29 @@ from PlotTweak import PlotTweak
 from sklearn.metrics import mean_squared_error
 from math import sqrt
 
-class ManuscriptFigures:
+sys.path.append("../LES-emulator-02postpros")
+from EmulatorMetaData import EmulatorMetaData
 
-    def __init__(self, emulatorPostprosDataRootFolder, figurefolder, responseVariable, filterValue = -999):
+class ManuscriptFigures(EmulatorMetaData):
 
+    def __init__(self, emulatorPostprosDataRootFolder, figureFolder, configFile):
+        
+        self.responseIndicatorVariable = "responseIndicator"
+        
+        super().__init__(configFile)
+        
         self.figures = {}
-
-        self.responseVariable = responseVariable
-
-        self.filterValue = filterValue
-
-        self.emulatedVariable = self.responseVariable + "_Emulated"
-
-        self.linearFitVariable = self.responseVariable + "_LinearFit"
-
+        
+    
         self.trainingSetList = ["LVL3Night",
                                "LVL3Day",
                                "LVL4Night",
                                "LVL4Day"]
 
         self.emulatorPostprosDataRootFolder = pathlib.Path(emulatorPostprosDataRootFolder)
-        self.figurefolder = pathlib.Path(figurefolder)
+        self.figureFolder = pathlib.Path(figureFolder)
 
-        self.figurefolder.mkdir( parents=True, exist_ok = True )
+        self.figureFolder.mkdir( parents=True, exist_ok = True )
 
 
 
@@ -89,7 +89,7 @@ class ManuscriptFigures:
         self.completeDataFrameFiltered = {}
         for trainingSet in self.trainingSetList:
             dataframe = self.completeDataFrame[trainingSet]
-            dataframe = dataframe.loc[ ~( numpy.isclose( dataframe[self.responseVariable ], self.filterValue, atol = 1)) ]
+            dataframe = dataframe.loc[ dataframe[self.filterIndex] ]
             self.completeDataFrameFiltered[trainingSet] = dataframe
 
     def initReadSensitivityData(self):
@@ -130,7 +130,7 @@ class ManuscriptFigures:
     def figureBarSensitivyData(self):
 
 
-        self.figures["figureSensitivityBar"] = Figure(self.figurefolder,"figureSensitivityBar", figsize=(12/2.54,6),  ncols = 2, nrows = 2, hspace=0.5, bottom=0.32)
+        self.figures["figureSensitivityBar"] = Figure(self.figureFolder,"figureSensitivityBar", figsize=(12/2.54,6),  ncols = 2, nrows = 2, hspace=0.5, bottom=0.32)
         fig = self.figures["figureSensitivityBar"]
 
         grey = Colorful.getDistinctColorList("grey")
@@ -191,7 +191,7 @@ class ManuscriptFigures:
     def figureLeaveOneOut(self):
 
 
-        self.figures["figureLeaveOneOut"] = Figure(self.figurefolder,"figureLeaveOneOut",
+        self.figures["figureLeaveOneOut"] = Figure(self.figureFolder,"figureLeaveOneOut",
                                                    figsize = [4.724409448818897, 4],  ncols = 2, nrows = 2,
                                                    bottom = 0.12, hspace = 0.08, wspace=0.04, top=0.88)
         fig = self.figures["figureLeaveOneOut"]
@@ -209,7 +209,7 @@ class ManuscriptFigures:
 
             dataframe = self.completeDataFrame[trainingSet]
 
-            dataframe = dataframe.loc[dataframe["leaveOneOutIndex"]]
+            dataframe = dataframe.loc[dataframe[self.filterIndex]]
 
 
             simulated = dataframe[self.responseVariable]
@@ -420,7 +420,8 @@ class ManuscriptFigures:
     def figureUpdraftLinearFit(self):
 
 
-        self.figures["figureLinearFit"] = Figure(self.figurefolder,"figureLinearFitIterated", figsize = [4.724409448818897, 6], ncols = 2, nrows = 2, bottom = 0.11, hspace = 0.08, wspace=0.12, top=0.8)
+        self.figures["figureLinearFit"] = Figure(self.figureFolder,"figureLinearFit", figsize = [4.724409448818897, 6],
+                                                 ncols = 2, nrows = 2, bottom = 0.11, hspace = 0.08, wspace=0.12, top=0.95)
         fig = self.figures["figureLinearFit"]
 
         xstart = -140
@@ -442,25 +443,6 @@ class ManuscriptFigures:
 
             updraftVariableName = self.responseVariable
 
-            # condition =  {}
-            # condition["tpot_inv"] = dataframe["tpot_inv"] > 5
-            # condition["lwpEndValue"] = dataframe["lwpEndValue"] > 10.
-            # condition["cfracEndValue"] = dataframe["cfracEndValue"] > 0.9
-            # condition["prcp"] =  dataframe["prcp"] < 1e-6
-
-            condition =  {}
-            # condition["tpot_inv"] = (dataframe["tpot_inv"] < 2.23)
-            # condition["lwpEndValue"] =  (dataframe["lwpEndValue"] < 1.)
-            condition["cfracEndValue"] = (dataframe["cfracEndValue"] < 0.61)
-            # condition["prcp"] = (dataframe["prcp"] > 6e-6) #BAD CONDITION
-
-            condition["cloudTopRelativeChange"] = (dataframe["cloudTopRelativeChange"] > 1.1)
-            # condition["lwpRelativeChange"] = (dataframe["lwpRelativeChange"] < 0.03)
-            #condition["notMatchObservation"] = ~ ( (dataframe[updraftVariableName] > dataframe["drflx"]*self.observationParameters["slope"]+ self.observationParameters["intercept"]-self.observationParameters["error"]) & (dataframe[updraftVariableName] < dataframe["drflx"]*self.observationParameters["slope"]+ self.observationParameters["intercept"]+self.observationParameters["error"]))
-            allConditions = Data.getNANDConditions(condition)
-            # print(allConditions)
-            dataframe = dataframe[ allConditions ]
-
             radiativeWarming  = dataframe["drflx"].values
             updraft =  dataframe[updraftVariableName].values
 
@@ -475,58 +457,9 @@ class ManuscriptFigures:
             coef = [slope, intercept]
             rSquared = numpy.power(r_value, 2)
 
-            print(trainingSet, f"{rSquared:.2f}", condition.keys(), dataframe.shape[0])
             dataColor = Colorful.getDistinctColorList("red")
             fitColor = "k"
             dataframe.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, alpha=0.3, color = dataColor)
-
-            anomalyColors = {}
-
-            if False:
-                anomalyColors["tpot_inv"] = "#808000"
-                dataframeAnomalies = dataframe.loc[ condition["tpot_inv"] ]
-                dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = anomalyColors["tpot_inv"])
-
-            if False:
-                anomalyColors["lwpEndValue"] = "#000099"
-                dataframeAnomalies = dataframe.loc[ condition["lwpEndValue"] ]
-                dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = anomalyColors["lwpEndValue"] )
-
-            if True:
-                anomalyColors["cfracEndValue"] = "#FF8000"
-                dataframeAnomalies = dataframe.loc[ condition["cfracEndValue"] ]
-                dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = anomalyColors["cfracEndValue"])
-
-            if False:
-                anomalyColors["prcp"] = "#33FFFF"
-                dataframeAnomalies = dataframe.loc[ condition["prcp"] ]
-                dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = anomalyColors["prcp"])
-
-            if False:
-
-                anomalyColors["2Conditions"] = "#FF00FF"
-                dataframeAnomalies = dataframeAnomalies = dataframe.loc[ Data.getNLengthSubsetConditions(condition,2)  ]
-                dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = anomalyColors["2Conditions"] )
-
-                # anomalyColors["3Conditions"] = "#00FF00"
-                # dataframeAnomalies = dataframe.loc[ Data.getNLengthSubsetConditions(condition,3)  ]
-                # dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = anomalyColors["3Conditions"])
-
-                anomalyColors["allConditions"] = "black"
-                dataframeAnomalies = dataframe.loc[ allConditions  ]
-                dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = anomalyColors["allConditions"])
-
-
-            # dataframeAnomalies = dataframe.loc[dataframe["cloudTopRelativeChange_high_tail"]]
-            dataframeAnomalies = dataframe.loc[ condition["cloudTopRelativeChange"]]
-            dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = self.cloudTopColor, marker = "x", linewidth = 1)
-
-            # dataframeAnomalies = dataframe.loc[dataframe["lwpRelativeChange_high_tail"]]
-            # dataframeAnomalies = dataframe.loc[ condition["lwpRelativeChange"]]
-            # dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = self.lwpColor, marker = "_", linewidth = 1)
-
-            # dataframeAnomalies = dataframe.loc[dataframe["tpot_inv_low_tail"]]
-            # dataframeAnomalies.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, color = self.tempColor, marker = "|", linewidth = 1)
 
             poly1d_fn = numpy.poly1d(coef)
 
@@ -559,18 +492,7 @@ class ManuscriptFigures:
                 collectionOfLabelsColors = {"Simulated data": dataColor, "Fit" : "k", "Observations" : color_obs}
                 legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
 
-
-                legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.cloudTopColor, marker='x', markersize = 12, linestyle='None',
-                          label='Cloud top rel. change >' + str(self.anomalyLimits.loc["cloudTopRelativeChange"]["high"])))
-                legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.lwpColor, marker='_', markersize = 12, linestyle="None",
-                          label='LWP rel. change >' + str(self.anomalyLimits.loc["lwpRelativeChange"]["high"])))
-                legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.tempColor, marker='|', markersize = 12, linestyle='None',
-                          label=r"$\Delta {\theta_{L}} < $" + str(self.anomalyLimits.loc["tpot_inv"]["low"])))
-
-                legendLabelColors.extend( PlotTweak.getPatches(anomalyColors))
-
-                # legendLabelColors = list(numpy.asarray(legendLabelColors).reshape(3,2).T.flatten())
-                artist = ax.legend( handles=legendLabelColors, loc=(0.17, 1.05), frameon = True, framealpha = 1.0, ncol = 2 )
+                artist = ax.legend( handles=legendLabelColors, loc=(0.17, 1.02), frameon = True, framealpha = 1.0, ncol = 3 )
 
                 ax.add_artist(artist)
 
@@ -599,7 +521,7 @@ class ManuscriptFigures:
                 ax.text(0.3,-0.25, PlotTweak.getUnitLabel("Cloud\ rad.\ warming", "W\ m^{-2}"), size=8)
 
     def figureUpdraftLinearFitVSEMul(self):
-        self.figures["figureLinearFitComparison"] = Figure(self.figurefolder,"figureLinearFitComparison", figsize = [4.724409448818897, 4.5],
+        self.figures["figureLinearFitComparison"] = Figure(self.figureFolder,"figureLinearFitComparison", figsize = [4.724409448818897, 4.5],
                      ncols = 2, nrows = 2, bottom = 0.11, hspace = 0.08, wspace=0.12, top=0.86)
         fig = self.figures["figureLinearFitComparison"]
         # xticks = numpy.arange(0, xend + 1, 10)
@@ -713,7 +635,7 @@ class ManuscriptFigures:
                 ax.text(PlotTweak.getXPosition(ax, -0.27), PlotTweak.getYPosition(ax, -0.4), PlotTweak.getUnitLabel("Updraft\ from\ linear\ fit", "m\ s^{-1}"), size=8 , rotation =90)
 
     def figureDistributionOfUpdrafts(self):
-        self.figures["figureDistributionOfUpdrafts"] = Figure(self.figurefolder, "figureDistributionOfUpdrafts", ncols = 2, nrows = 2)
+        self.figures["figureDistributionOfUpdrafts"] = Figure(self.figureFolder, "figureDistributionOfUpdrafts", ncols = 2, nrows = 2)
 
         fig = self.figures["figureDistributionOfUpdrafts"]
 
@@ -723,11 +645,10 @@ class ManuscriptFigures:
             dataframe = self.completeDataFrameFiltered[trainingSet]
 
 
-            dataframe["wpos"].plot.hist(ax=ax, bins = 20, color = "b",  style='--', alpha = 0.5 )
             dataframe[self.responseVariable].plot.hist(ax=ax, bins = 20, color = "r",  style='--', alpha = 0.5 )
 
     def figureWposVSWposWeighted(self):
-        self.figures["figureWposVSWposWeighted"] = Figure(self.figurefolder, "figureWposVSWposWeighted", ncols = 2, nrows = 2)
+        self.figures["figureWposVSWposWeighted"] = Figure(self.figureFolder, "figureWposVSWposWeighted", ncols = 2, nrows = 2)
 
         fig = self.figures["figureWposVSWposWeighted"]
 
@@ -740,7 +661,7 @@ class ManuscriptFigures:
 
 
     def figureErrorDistribution(self):
-        self.figures["figureErrorDistribution"] = Figure(self.figurefolder,"figureErrorDistribution",  ncols = 2, nrows = 2,
+        self.figures["figureErrorDistribution"] = Figure(self.figureFolder,"figureErrorDistribution",  ncols = 2, nrows = 2,
                      bottom = 0.15, hspace = 0.08, wspace=0.04, top=0.90)
         fig = self.figures["figureErrorDistribution"]
 
@@ -830,22 +751,22 @@ class ManuscriptFigures:
 
 def main():
 
-    figObject = ManuscriptFigures("/home/aholaj/Data/EmulatorManuscriptDataW2Pos",
-                                  "/home/aholaj/Data/EmulatorManuscriptDataW2Pos/figures/Filter2",
-                                  "w2pos")
+    figObject = ManuscriptFigures("/home/aholaj/mounttauskansiot/puhtiwork/EmulatorManuscriptData",
+                                  "/home/aholaj/mounttauskansiot/puhtiwork/EmulatorManuscriptData/figures/",
+                                  "/home/aholaj/mounttauskansiot/puhtiwork/EmulatorManuscriptData/phase02.yaml")
 
     if False:
         figObject.initReadSensitivityData()
         figObject.figureBarSensitivyData()
     if True:
         figObject.figureLeaveOneOut()
-    if False:
+    if True:
         figObject.figureUpdraftLinearFit()
     if False:
         figObject.figureUpdraftLinearFitVSEMul()
-    if False:
+    if True:
         figObject.figureErrorDistribution()
-    if False:
+    if True:
         figObject.figureDistributionOfUpdrafts()
     if False:
         figObject.figureWposVSWposWeighted()
