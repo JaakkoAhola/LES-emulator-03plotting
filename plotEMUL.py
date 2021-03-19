@@ -193,7 +193,7 @@ class ManuscriptFigures(EmulatorMetaData):
 
         self.figures["figureLeaveOneOut"] = Figure(self.figureFolder,"figureLeaveOneOut",
                                                    figsize = [4.724409448818897, 4],  ncols = 2, nrows = 2,
-                                                   bottom = 0.12, hspace = 0.08, wspace=0.04, top=0.88)
+                                                   bottom = 0.12, hspace = 0.08, wspace=0.04, top=0.95)
         fig = self.figures["figureLeaveOneOut"]
 
         end = 0.8
@@ -226,14 +226,8 @@ class ManuscriptFigures(EmulatorMetaData):
 
             dataframe.plot.scatter(ax = ax, x=self.responseVariable, y=self.emulatedVariable,alpha=0.3)
 
-            dataframeAnomalies = dataframe.loc[dataframe["cloudTopRelativeChange_high_tail"]]
-            dataframeAnomalies.plot.scatter(ax = ax, x=self.responseVariable, y=self.emulatedVariable, color = self.cloudTopColor, marker = "x", linewidth = 1)
 
-            dataframeAnomalies = dataframe.loc[dataframe["lwpRelativeChange_high_tail"]]
-            dataframeAnomalies.plot.scatter(ax = ax, x=self.responseVariable, y=self.emulatedVariable, color = "blue", marker = "_", linewidth = 1)
 
-            dataframeAnomalies = dataframe.loc[dataframe["tpot_inv_low_tail"]]
-            dataframeAnomalies.plot.scatter(ax = ax, x=self.responseVariable, y=self.emulatedVariable, color = self.tempColor, marker = "|", linewidth = 1)
 
             coef = [slope, intercept]
             poly1d_fn = numpy.poly1d(coef)
@@ -254,18 +248,6 @@ class ManuscriptFigures(EmulatorMetaData):
 
             if ind == 0:
                 legendLabelColors = []
-
-                legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.cloudTopColor, marker='x', markersize = 12, linestyle='None',
-                          label='Cloud top rel. change >' + str(self.anomalyLimits.loc["cloudTopRelativeChange"]["high"])))
-                legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.lwpColor, marker='_', markersize = 12, linestyle="None",
-                          label='LWP rel. change >' + str(self.anomalyLimits.loc["lwpRelativeChange"]["high"])))
-                legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.tempColor, marker='|', markersize = 12, linestyle='None',
-                          label=r"$\Delta {\theta_{L}} < $" + str(self.anomalyLimits.loc["tpot_inv"]["low"])))
-
-
-                artist = ax.legend( handles=legendLabelColors, loc=(0.17, 1.05), frameon = True, framealpha = 1.0, ncol = 2 )
-
-                ax.add_artist(artist)
 
             if ind in [2,3]:
 
@@ -752,10 +734,10 @@ class ManuscriptFigures(EmulatorMetaData):
 def main():
 
     figObject = ManuscriptFigures("/home/aholaj/mounttauskansiot/puhtiwork/EmulatorManuscriptData",
-                                  "/home/aholaj/mounttauskansiot/puhtiwork/EmulatorManuscriptData/figures/",
+                                  "/home/aholaj/Nextcloud/000_WORK/000_ARTIKKELIT/02_LES-Emulator/001_Manuscript_LES_emulator/figures",
                                   "/home/aholaj/mounttauskansiot/puhtiwork/EmulatorManuscriptData/phase02.yaml")
 
-    if False:
+    if True:
         figObject.initReadSensitivityData()
         figObject.figureBarSensitivyData()
     if True:
@@ -766,7 +748,7 @@ def main():
         figObject.figureUpdraftLinearFitVSEMul()
     if True:
         figObject.figureErrorDistribution()
-    if True:
+    if False:
         figObject.figureDistributionOfUpdrafts()
     if False:
         figObject.figureWposVSWposWeighted()
