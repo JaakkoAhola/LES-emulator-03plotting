@@ -196,7 +196,7 @@ class ManuscriptFigures(EmulatorMetaData):
                                                    bottom = 0.12, hspace = 0.08, wspace=0.04, top=0.95)
         fig = self.figures["figureLeaveOneOut"]
 
-        end = 0.8
+        end = 1.0
         ticks = numpy.arange(0, end + .01, 0.1)
         tickLabels = [f"{t:.1f}" for t in ticks]
 
@@ -267,9 +267,9 @@ class ManuscriptFigures(EmulatorMetaData):
                 PlotTweak.hideYTickLabels(ax)
 
             if ind == 2:
-                ax.text(0.5,-0.2, PlotTweak.getUnitLabel("Simulated\ w_{pos}", "m\ s^{-1}"), size=8)
+                ax.text(0.5,-0.25, PlotTweak.getUnitLabel("Simulated\ w_{pos}", "m\ s^{-1}"), size=8)
             if ind == 0:
-                ax.text(-0.2,-0.5, PlotTweak.getUnitLabel("Emulated\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
+                ax.text(-0.25,-0.5, PlotTweak.getUnitLabel("Emulated\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
 
     def analyseLinearFit(self):
         condition = {}
@@ -402,7 +402,7 @@ class ManuscriptFigures(EmulatorMetaData):
     def figureUpdraftLinearFit(self):
 
 
-        self.figures["figureLinearFit"] = Figure(self.figureFolder,"figureLinearFit", figsize = [4.724409448818897, 6],
+        self.figures["figureLinearFit"] = Figure(self.figureFolder,"figureLinearFit", figsize = [4.724409448818897, 4],
                                                  ncols = 2, nrows = 2, bottom = 0.11, hspace = 0.08, wspace=0.12, top=0.95)
         fig = self.figures["figureLinearFit"]
 
@@ -501,6 +501,98 @@ class ManuscriptFigures(EmulatorMetaData):
                         PlotTweak.getUnitLabel("Simulated\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
             if ind == 2:
                 ax.text(0.3,-0.25, PlotTweak.getUnitLabel("Cloud\ rad.\ warming", "W\ m^{-2}"), size=8)
+                
+    def figureUpdraftCorrectedLinearFit(self):
+        from scipy import stats
+
+        self.figures["figureCorrectedLinearFit"] = Figure(self.figureFolder,"figureCorrectedLinearFit",
+                                                          figsize = [4.724409448818897, 4],  ncols = 2, nrows = 2,
+                                                   bottom = 0.12, hspace = 0.08, wspace=0.04, top=0.95)
+        fig = self.figures["figureCorrectedLinearFit"]
+        
+        end = 1.0
+        ticks = numpy.arange(0, end + .01, 0.1)
+        tickLabels = [f"{t:.1f}" for t in ticks]
+
+        showList = Data.cycleBoolean(len(ticks))
+
+        showList[-1] = False
+        
+        correctedColor = Colorful.getDistinctColorList("green")
+
+        for ind,trainingSet in enumerate(self.trainingSetList):
+            ax = fig.getAxes(ind)
+
+            dataframe = self.completeDataFrame[trainingSet]
+
+            dataframe = dataframe.loc[dataframe[self.filterIndex]]
+
+
+            simulated = dataframe[self.responseVariable]
+            emulated  = dataframe[self.emulatedVariable]
+
+
+
+            # stats = self.statsCollection[trainingSet].loc["correctedLinearFitStats"]
+
+            # slope = stats["slope"]
+            # intercept = stats["intercept"]
+            # rSquared = stats["rSquared"]
+
+            corrected = dataframe[ self.correctedLinearFitVariable ].values
+            simulated =  dataframe[ self.responseVariable ].values
+            
+            slope, intercept, r_value, p_value, std_err = stats.linregress(simulated, corrected)
+
+            rSquared = numpy.power(r_value, 2)
+
+
+            dataframe.plot.scatter(ax = ax, x=self.responseVariable, y=self.correctedLinearFitVariable, alpha=0.3, color = correctedColor)
+
+
+            coef = [slope, intercept]
+            poly1d_fn = numpy.poly1d(coef)
+            ax.plot(simulated, poly1d_fn(simulated), color = "k")
+
+            ax.set_ylim([0, end])
+
+            ax.set_xlim([0, end])
+
+
+            PlotTweak.setAnnotation(ax, self.annotationCollection[trainingSet],
+                                    xPosition=ax.get_xlim()[1]*0.05, yPosition = ax.get_ylim()[1]*0.90)
+
+            PlotTweak.setAnnotation(ax, PlotTweak.getLatexLabel(f"R^2={rSquared:.2f}",""), xPosition=0.5, yPosition=0.1, bbox_props = None)
+
+            PlotTweak.setXaxisLabel(ax,"")
+            PlotTweak.setYaxisLabel(ax,"")
+
+            if ind == 0:
+                legendLabelColors = []
+
+            if ind in [2,3]:
+
+
+                ax.set_xticks(ticks)
+                ax.set_xticklabels(tickLabels)
+                PlotTweak.hideLabels(ax.xaxis, showList)
+            else:
+                PlotTweak.hideXTickLabels(ax)
+
+            if ind in [0,2]:
+                ax.set_yticks(ticks)
+                ax.set_yticklabels(tickLabels)
+                PlotTweak.hideLabels(ax.yaxis, showList)
+            else:
+
+                PlotTweak.hideYTickLabels(ax)
+
+            if ind == 2:
+                ax.text(0.5,-0.25, PlotTweak.getUnitLabel("Simulated\ w_{pos}", "m\ s^{-1}"), size=8)
+            if ind == 0:
+                ax.text(-0.25,-0.5, PlotTweak.getUnitLabel("Corrected\ Linear\ Fit\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
+        
+        
 
     def figureUpdraftLinearFitVSEMul(self):
         self.figures["figureLinearFitComparison"] = Figure(self.figureFolder,"figureLinearFitComparison", figsize = [4.724409448818897, 4.5],
@@ -744,6 +836,8 @@ def main():
         figObject.figureLeaveOneOut()
     if True:
         figObject.figureUpdraftLinearFit()
+    if True:
+        figObject.figureUpdraftCorrectedLinearFit()
     if False:
         figObject.figureUpdraftLinearFitVSEMul()
     if True:
