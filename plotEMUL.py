@@ -15,8 +15,8 @@ import numpy
 import os
 import pandas
 import pathlib
-import scipy
 import sys
+from scipy import stats
 import time
 
 sys.path.append(os.environ["LESMAINSCRIPTS"])
@@ -58,6 +58,11 @@ class ManuscriptFigures(EmulatorMetaData):
             "(b) SB Day",
             "(c) SALSA Night",
             "(d) SALSA Day"]
+        
+        self.traininSetSensibleNames = ["SB\ Night",
+            "SB\ Day",
+            "SALSA\ Night",
+            "SALSA\ Day"]
 
         self.annotationCollection = dict(zip(self.trainingSetList, self.annotationValues))
 
@@ -213,21 +218,15 @@ class ManuscriptFigures(EmulatorMetaData):
 
 
             simulated = dataframe[self.responseVariable]
-            emulated  = dataframe[self.emulatedVariable]
 
+            statistics = self.statsCollection[trainingSet].loc["leaveOneOutStats"]
 
-
-            stats = self.statsCollection[trainingSet].loc["leaveOneOutStats"]
-
-            slope = stats["slope"]
-            intercept = stats["intercept"]
-            rSquared = stats["rSquared"]
+            slope = statistics["slope"]
+            intercept = statistics["intercept"]
+            rSquared = statistics["rSquared"]
 
 
             dataframe.plot.scatter(ax = ax, x=self.responseVariable, y=self.emulatedVariable,alpha=0.3)
-
-
-
 
             coef = [slope, intercept]
             poly1d_fn = numpy.poly1d(coef)
@@ -270,13 +269,180 @@ class ManuscriptFigures(EmulatorMetaData):
                 ax.text(0.5,-0.25, PlotTweak.getUnitLabel("Simulated\ w_{pos}", "m\ s^{-1}"), size=8)
             if ind == 0:
                 ax.text(-0.25,-0.5, PlotTweak.getUnitLabel("Emulated\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
+    
+    
+    def figureMethodsVsSimuted(self):
+        numberOfMethods = 3
+        self.figures["figureMethodsVsSimuted"] = Figure(self.figureFolder,"figureMethodsVsSimuted",
+                                                   figsize = [4.724409448818897, 7],  ncols = numberOfMethods, nrows = 4,
+                                                   bottom = 0.07, hspace = 0.09, wspace=0.09, top=0.95, left=0.16, right = 0.98)
+        fig = self.figures["figureMethodsVsSimuted"]
+        
+        print("figureMethodsVsSimuted")
+        
+        start = 0.0
+        end = 1.0
+        ticks = numpy.arange(0, end + .01, 0.1)
+        tickLabels = [f"{t:.1f}" for t in ticks]
 
+        showList = Data.cycleBoolean(len(ticks))
+
+        showList[0] = False
+        showList[-1] = False
+        
+        
+                
+        
+        emulatorColor = Colorful.getDistinctColorList("blue")
+        linearColor = Colorful.getDistinctColorList("red")
+        correctedColor = Colorful.getDistinctColorList("green")
+        
+        rSquaredList = numpy.zeros(12)
+        
+        ncol = 0 # emulator
+        for setInd,trainingSet in enumerate(self.trainingSetList):
+            ind = ncol + numberOfMethods*setInd
+            ax = fig.getAxes(ind)
+
+            dataframe = self.completeDataFrame[trainingSet]
+
+            dataframe = dataframe.loc[dataframe[self.filterIndex]]
+
+
+            simulated = dataframe[self.responseVariable]
+
+            statistics = self.statsCollection[trainingSet].loc["leaveOneOutStats"]
+
+            slope = statistics["slope"]
+            intercept = statistics["intercept"]
+            rSquared = statistics["rSquared"]
+
+            rSquaredList[ind] = rSquared
+
+            dataframe.plot.scatter(ax = ax, x=self.responseVariable, y=self.emulatedVariable,color = emulatorColor, alpha=0.3)
+
+            coef = [slope, intercept]
+            poly1d_fn = numpy.poly1d(coef)
+            ax.plot(simulated.values, poly1d_fn(simulated.values), color = "k")
+
+
+            
+
+            PlotTweak.setXaxisLabel(ax,"")
+            PlotTweak.setYaxisLabel(ax,"")
+        
+        ncol+=1 # linear fit
+        for setInd,trainingSet in enumerate(self.trainingSetList):
+            ind = ncol + numberOfMethods*setInd
+            ax = fig.getAxes(ind)
+
+            dataframe = self.completeDataFrameFiltered[trainingSet]
+            simulatedFit = dataframe[self.responseVariable]
+            fittedFit = dataframe[self.linearFitVariable]
+
+            slopeFit, interceptFit, r_valueFit, p_valueFit, std_errFit = stats.linregress(simulatedFit, fittedFit)
+
+            rSquaredFit = numpy.power(r_valueFit,2)
+            
+            rSquaredList[ind] = rSquaredFit
+
+            coefFit = [slopeFit, interceptFit]
+
+            fitColor = "k"
+            
+            dataframe.plot.scatter(ax=ax, x=self.responseVariable, y=self.linearFitVariable, alpha = 0.3, color=linearColor)
+
+            poly1d_fn = numpy.poly1d(coefFit)
+
+            ax.plot(simulatedFit.values, poly1d_fn(simulatedFit.values), color = fitColor)
+            
+        ncol += 1 # corrected linear fit
+        for setInd,trainingSet in enumerate(self.trainingSetList):
+            ind = ncol + numberOfMethods*setInd
+            ax = fig.getAxes(ind)
+
+            dataframe = self.completeDataFrame[trainingSet]
+
+            dataframe = dataframe.loc[dataframe[self.filterIndex]]
+
+            simulated =  dataframe[ self.responseVariable ].values
+            
+            # statistics = self.statsCollection[trainingSet].loc["correctedLinearFitStats"]
+
+            # slope = statistics["slope"]
+            # intercept = statistics["intercept"]
+            # rSquared = statistics["rSquared"]
+            corrected = dataframe[ self.correctedLinearFitVariable ].values
+            simulated =  dataframe[ self.responseVariable ].values
+            
+            slope, intercept, r_value, p_value, std_err = stats.linregress(simulated, corrected)
+
+            rSquared = numpy.power(r_value, 2)
+            
+            rSquaredList[ind] = rSquared
+
+            dataframe.plot.scatter(ax = ax, x=self.responseVariable, y=self.correctedLinearFitVariable, alpha=0.3, color = correctedColor)
+
+            coef = [slope, intercept]
+            poly1d_fn = numpy.poly1d(coef)
+            ax.plot(simulated, poly1d_fn(simulated), color = "k")
+
+    
+        for ind in range(12):
+            ax = fig.getAxes(ind)
+            ax.set_ylim([start, end])
+
+            ax.set_xlim([start, end])
+
+            PlotTweak.setAnnotation(ax, f"({Data.getNthLetter(ind)})",
+                                    xPosition=ax.get_xlim()[1]*0.05, yPosition = ax.get_ylim()[1]*0.90)
+            
+            PlotTweak.setAnnotation(ax, PlotTweak.getLatexLabel(f"R^2={rSquaredList[ind]:.2f}",""), xPosition=0.5, yPosition=0.1, bbox_props = None)
+            
+            PlotTweak.setXaxisLabel(ax,"")
+            PlotTweak.setYaxisLabel(ax,"")
+            
+            PlotTweak.setXTickSizes(ax, Data.cycleBoolean(len(ticks)))
+            PlotTweak.setYTickSizes(ax, Data.cycleBoolean(len(ticks)))
+            
+            ax.set_xticks(ticks)
+            ax.set_xticklabels(tickLabels)
+            PlotTweak.hideLabels(ax.xaxis, showList)
+            
+            ax.set_yticks(ticks)
+            ax.set_yticklabels(tickLabels)
+            PlotTweak.hideLabels(ax.yaxis, showList)
+            
+            if ind not in numpy.asarray(range(4))*3:
+                PlotTweak.hideYTickLabels(ax)
+            else:
+                ax.text(PlotTweak.getXPosition(ax, -0.56), PlotTweak.getYPosition(ax, 0.3),
+                        PlotTweak.getLatexLabel(self.traininSetSensibleNames[ind//3]), size=8 , rotation =90)
+
+            if ind not in list(range(9,12)):
+                PlotTweak.hideXTickLabels(ax)
+                
+            if ind == 1:
+                collectionOfLabelsColors = {"Emulator": emulatorColor, "Linear Fit" : linearColor, "Corr. Lin. Fit" : correctedColor}
+                legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
+
+                artist = ax.legend( handles=legendLabelColors, loc=(-.9, 1.05), frameon = True, framealpha = 1.0, ncol = 3 )
+
+                ax.add_artist(artist)
+                
+            if ind == 3:
+                ax.text(PlotTweak.getXPosition(ax, -0.42), PlotTweak.getYPosition(ax, -0.5),
+                        PlotTweak.getUnitLabel("Predicted\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
+            if ind == 10:
+                ax.text(-0.1,-0.27,PlotTweak.getUnitLabel("Simulated\ w_{pos}", "m\ s^{-1}") , size=8)
+                
+            
     def analyseLinearFit(self):
         condition = {}
         updraftVariableName = self.responseVariable
 
         data = {}
-        from scipy import stats
+        
 
         variables = ["q_inv", "tpot_inv", "lwp", "tpot_pbl", "pblh", "cos_mu", "pblh_m", "prcp", "wpos", "w2pos", "drflx", "lwpEndValue", "lwpRelativeChange", "cfracEndValue", "cloudTopRelativeChange"]
 
@@ -348,7 +514,6 @@ class ManuscriptFigures(EmulatorMetaData):
         updraftVariableName = self.responseVariable
 
         data = {}
-        from scipy import stats
 
         variables = ["q_inv", "tpot_inv", "lwp", "tpot_pbl", "pblh", "cos_mu", "pblh_m", "prcp", "wpos", "w2pos", "drflx", "lwpEndValue", "lwpRelativeChange", "cfracEndValue", "cloudTopRelativeChange"]
         tailPercentile = 0.05
@@ -435,7 +600,7 @@ class ManuscriptFigures(EmulatorMetaData):
                             poly1d_Observation(sorted(radiativeWarming)) - self.observationParameters["error"]*numpy.ones(numpy.shape(radiativeWarming)), poly1d_Observation(sorted(radiativeWarming)) + self.observationParameters["error"]*numpy.ones(numpy.shape(radiativeWarming)),
                             alpha=0.2)
 
-            slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(radiativeWarming, updraft)
+            slope, intercept, r_value, p_value, std_err = stats.linregress(radiativeWarming, updraft)
             coef = [slope, intercept]
             rSquared = numpy.power(r_value, 2)
 
@@ -503,7 +668,6 @@ class ManuscriptFigures(EmulatorMetaData):
                 ax.text(0.3,-0.25, PlotTweak.getUnitLabel("Cloud\ rad.\ warming", "W\ m^{-2}"), size=8)
                 
     def figureUpdraftCorrectedLinearFit(self):
-        from scipy import stats
 
         self.figures["figureCorrectedLinearFit"] = Figure(self.figureFolder,"figureCorrectedLinearFit",
                                                           figsize = [4.724409448818897, 4],  ncols = 2, nrows = 2,
@@ -528,16 +692,11 @@ class ManuscriptFigures(EmulatorMetaData):
             dataframe = dataframe.loc[dataframe[self.filterIndex]]
 
 
-            simulated = dataframe[self.responseVariable]
-            emulated  = dataframe[self.emulatedVariable]
+            # statistics = self.statsCollection[trainingSet].loc["correctedLinearFitStats"]
 
-
-
-            # stats = self.statsCollection[trainingSet].loc["correctedLinearFitStats"]
-
-            # slope = stats["slope"]
-            # intercept = stats["intercept"]
-            # rSquared = stats["rSquared"]
+            # slope = statistics["slope"]
+            # intercept = statistics["intercept"]
+            # rSquared = statistics["rSquared"]
 
             corrected = dataframe[ self.correctedLinearFitVariable ].values
             simulated =  dataframe[ self.responseVariable ].values
@@ -616,7 +775,7 @@ class ManuscriptFigures(EmulatorMetaData):
             simulatedFit = dataframe[self.responseVariable]
             fittedFit = dataframe[self.linearFitVariable]
 
-            slopeFit, interceptFit, r_valueFit, p_valueFit, std_errFit = scipy.stats.linregress(simulatedFit, fittedFit)
+            slopeFit, interceptFit, r_valueFit, p_valueFit, std_errFit = stats.linregress(simulatedFit, fittedFit)
 
             rSquaredFit = numpy.power(r_valueFit,2)
 
@@ -846,6 +1005,8 @@ def main():
         figObject.figureDistributionOfUpdrafts()
     if False:
         figObject.figureWposVSWposWeighted()
+    if True:
+        figObject.figureMethodsVsSimuted()
 
     figObject.finalise()
 
