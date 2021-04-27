@@ -97,10 +97,36 @@ class ManuscriptFigures(EmulatorMetaData):
             dataframe = dataframe.loc[ dataframe[self.filterIndex] ]
             self.completeDataFrameFiltered[trainingSet] = dataframe
 
-    def initReadSensitivityData(self):
-        self.sensitivityDataCollection = {}
+    def initReadFeatureImportanceData(self):
+        self.featureImportanceDataCollection = {}
+        self.allLabels = []
         for trainingSet in self.trainingSetList:
-            self.sensitivityDataCollection[trainingSet] = pandas.read_csv( self.emulatorPostprosDataRootFolder / trainingSet / ( trainingSet + "_sensitivityAnalysis.csv" ), index_col = 0 )
+            self.featureImportanceDataCollection[trainingSet] = {}
+            dataset = pandas.read_csv( self.emulatorPostprosDataRootFolder / trainingSet / ( trainingSet + "_featureImportance.csv" ), index_col = 0 )
+            for ind in dataset.index:
+                series = dataset.loc[ind]
+                mean = series.loc[[kk for kk in series.index if kk[-4:] == "Mean"]]
+                std = series.loc[[kk for kk in series.index if kk[-4:] == "Mean"]]
+                ines = [kk[:-22] for kk in series.index if kk[-4:] == "Mean"]
+                
+                self.allLabels += ines
+                
+                subset = pandas.DataFrame(data =  {"Mean" : mean.values, "Std": std.values}, index = ines).dropna()
+                
+                subset["mathLabel"] = subset.apply(lambda row: PlotTweak.getMathLabel(row.name), axis = 1)
+                
+                self.featureImportanceDataCollection[trainingSet][ind] = subset
+        
+        self.uniqueLabels = list(set(self.allLabels))
+        self._getColorsForLabels()
+        
+        for trainingSet in self.featureImportanceDataCollection:
+            for predictor in self.featureImportanceDataCollection[trainingSet]:
+                subset  = self.featureImportanceDataCollection[trainingSet][predictor]
+                subset["color"] = subset.apply(lambda row: self.labelColors[row.name], axis = 1)
+        
+        
+
 
     def _initReadStats(self):
         self.statsCollection = {}
@@ -109,22 +135,14 @@ class ManuscriptFigures(EmulatorMetaData):
     def _initReadLimits(self):
         self.anomalyLimits = pandas.read_csv( self.emulatorPostprosDataRootFolder / "anomalyLimits.csv", index_col = 0)
 
-    def _getColorsForLabels(self, labels):
-        labels = list(labels)
-        uniqueLabels = []
-
-        for label in labels:
-            if label not in uniqueLabels:
-                uniqueLabels.append(label)
-
-        uniqueColors =  Colorful.getIndyColorList( len(uniqueLabels) )
-        labelColors = dict(zip(uniqueLabels, uniqueColors))
-
-        colorList = []
-        for label in labels:
-            colorList.append(labelColors[label])
-
-        return colorList, labelColors
+    def _getColorsForLabels(self):
+        self.uniqueColors =  Colorful.getIndyColorList( len(self.uniqueLabels) )
+        
+        self.labelColors = dict(zip(self.uniqueLabels, self.uniqueColors))
+        
+        self.uniqueMathLabels = [PlotTweak.getMathLabel(label) for label in self.uniqueLabels]
+        
+        self.mathLabelColors = dict(zip(self.uniqueMathLabels, self.uniqueColors))
 
     def finalise(self):
 
@@ -132,64 +150,60 @@ class ManuscriptFigures(EmulatorMetaData):
             fig.save()
 
 
-    def figureBarSensitivyData(self):
+    def figureBarFeatureImportanceData(self):
+        ncols = len(self.featureImportanceDataCollection[list(self.featureImportanceDataCollection)[0]]) # number of methods
+        nrows = len(self.featureImportanceDataCollection) # = number of training sets
 
-
-        self.figures["figureSensitivityBar"] = Figure(self.figureFolder,"figureSensitivityBar", figsize=(12/2.54,6),  ncols = 2, nrows = 2, hspace=0.5, bottom=0.32)
-        fig = self.figures["figureSensitivityBar"]
+        self.figures["figureFeatureImportanceBar"] = Figure(self.figureFolder,"figureFeatureImportanceBar",
+                                                            figsize=(12/2.54,6), 
+                                                            ncols = ncols, nrows = nrows,
+                                                            hspace=0.8, bottom=0.20, wspace = 0.05, top = 0.97)
+        fig = self.figures["figureFeatureImportanceBar"]
 
         grey = Colorful.getDistinctColorList("grey")
-        allLabels = []
-        for ind,trainingSet in enumerate(self.trainingSetList):
-            allLabels = numpy.concatenate((self.sensitivityDataCollection[trainingSet].index.values, allLabels))
-
-        colorList, labelColors = self._getColorsForLabels(allLabels)
-
-        legendLabelColors = {}
-        for ind,trainingSet in enumerate(self.trainingSetList):
+        
+        maksimi = 0
+        
+        for row,trainingSet in enumerate(list(self.featureImportanceDataCollection)):
+            for col, predictor in enumerate(list(self.featureImportanceDataCollection[trainingSet])):
+                
+                dataframe = self.featureImportanceDataCollection[trainingSet][predictor].sort_values(by="Mean", ascending=False)
+                maksimi = max(dataframe["Mean"].max(), maksimi)
+                ax = fig.getAxesGridPoint( {"row": row, "col": col})
+                
+                dataframe.plot(ax=ax, kind="bar",color=dataframe["color"], x="mathLabel", y = "Mean", legend = False)
+        
+                
+        
+        for ind in range(nrows*ncols):
             ax = fig.getAxes(ind)
-
-            dataframe = self.sensitivityDataCollection[trainingSet].sort_values(by=["MainEffect"], ascending=False)
-            dataframe["mathLabel"] = dataframe.apply(lambda row: PlotTweak.getMathLabel(row.name), axis=1)
-
-            nroVariables = dataframe.shape[0]
-            margin_bottom = numpy.zeros(nroVariables)
-
-            oneColorList = []
-
-            for variable in dataframe.index:
-                indColor = labelColors[variable]
-                oneColorList.append(indColor)
-
-                mathlabel = dataframe.loc[variable]["mathLabel"]
-
-                if mathlabel not in legendLabelColors:
-                    legendLabelColors[mathlabel] = indColor
-
-            for k,key in enumerate(["Interaction","MainEffect"]):
-                if key == "MainEffect":
-                    color = oneColorList
-                else:
-                    color = grey
-                dataframe.plot(ax=ax, kind="bar",color=color, stacked=True, x="mathLabel", y = key, legend = False)
-
-                margin_bottom += dataframe[key].values
-
-            yTicks = numpy.arange(0, 0.51, 0.1)
+            
+            ymax = round(maksimi, 1) + 0.11
+            yTicks = numpy.arange(0, ymax, 0.1)
             yTickLabels = [f"{t:.1f}" for t in yTicks]
+            showList = Data.cycleBoolean(len(yTicks))
             ax.set_yticks(yTicks)
             ax.set_yticklabels(yTickLabels)
-            ax.set_ylim([0, 0.5])
-            PlotTweak.setAnnotation(ax, self.annotationCollection[trainingSet], xPosition=ax.get_xlim()[1]*0.20, yPosition = ax.get_ylim()[1]*0.90)
+            ax.set_ylim([0, ymax])
+            PlotTweak.hideLabels(ax.yaxis, showList)
+            
             PlotTweak.setXaxisLabel(ax,"")
+            
+            PlotTweak.setAnnotation(ax, f"({Data.getNthLetter(ind)})",
+                                    xPosition=ax.get_xlim()[1]*0.07, yPosition = ax.get_ylim()[1]*0.80)
+            
+            if ind not in numpy.asarray(range(nrows))*ncols:
+                PlotTweak.hideYTickLabels(ax)
+            else:
+                ax.text(PlotTweak.getXPosition(ax, -0.24), PlotTweak.getYPosition(ax, 0.),
+                            PlotTweak.getLatexLabel(self.traininSetSensibleNames[ind//ncols]), size=8 , rotation =90)
+            if ind == 0:
+                ax.text(1, 1.3, "Emulator", size=8)
+            if ind == 1:
+                ax.text(1,1.3, "Corrected linear fit", size=8)
 
-        labelColors["Interaction"] = grey
-
-
-
-        fig.getAxes(0).legend(handles=PlotTweak.getPatches(legendLabelColors),
-                                title = "Global variance -based sensitivity for " + PlotTweak.getLatexLabel("w_{pos}", False),
-                      loc=(-0.2,-2.6),
+        fig.getAxes(-1).legend(handles=PlotTweak.getPatches(self.mathLabelColors),
+                      loc=(-0.9,-1.59),
                       ncol = 4,
                       fontsize = 8)
 
@@ -198,7 +212,7 @@ class ManuscriptFigures(EmulatorMetaData):
 
         self.figures["figureLeaveOneOut"] = Figure(self.figureFolder,"figureLeaveOneOut",
                                                    figsize = [4.724409448818897, 4],  ncols = 2, nrows = 2,
-                                                   bottom = 0.12, hspace = 0.08, wspace=0.04, top=0.95)
+                                                   bottom = 0.12, hspace = 0.08, wspace=0.04, top=0.98)
         fig = self.figures["figureLeaveOneOut"]
 
         end = 1.0
@@ -989,23 +1003,23 @@ def main():
                                   "/home/aholaj/mounttauskansiot/puhtiwork/EmulatorManuscriptData/phase02.yaml")
 
     if True:
-        figObject.initReadSensitivityData()
-        figObject.figureBarSensitivyData()
-    if True:
+        figObject.initReadFeatureImportanceData()
+        figObject.figureBarFeatureImportanceData()
+    if False:
         figObject.figureLeaveOneOut()
-    if True:
+    if False:
         figObject.figureUpdraftLinearFit()
-    if True:
+    if False:
         figObject.figureUpdraftCorrectedLinearFit()
     if False:
         figObject.figureUpdraftLinearFitVSEMul()
-    if True:
+    if False:
         figObject.figureErrorDistribution()
     if False:
         figObject.figureDistributionOfUpdrafts()
     if False:
         figObject.figureWposVSWposWeighted()
-    if True:
+    if False:
         figObject.figureMethodsVsSimuted()
 
     figObject.finalise()
