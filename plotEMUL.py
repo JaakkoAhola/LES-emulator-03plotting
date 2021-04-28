@@ -100,6 +100,7 @@ class ManuscriptFigures(EmulatorMetaData):
     def initReadFeatureImportanceData(self):
         self.featureImportanceDataCollection = {}
         self.allLabels = []
+        self.legendCols = 4
         for trainingSet in self.trainingSetList:
             self.featureImportanceDataCollection[trainingSet] = {}
             dataset = pandas.read_csv( self.emulatorPostprosDataRootFolder / trainingSet / ( trainingSet + "_featureImportance.csv" ), index_col = 0 )
@@ -114,10 +115,68 @@ class ManuscriptFigures(EmulatorMetaData):
                 subset = pandas.DataFrame(data =  {"Mean" : mean.values, "Std": std.values}, index = ines).dropna()
                 
                 subset["mathLabel"] = subset.apply(lambda row: PlotTweak.getMathLabel(row.name), axis = 1)
+
+                subset = subset.sort_values("Mean", ascending=False)
+                subset["points"] = range(len(subset))
+                summa = subset["Mean"].sum()
+
+                subset["relativeImportance"] = subset.apply(lambda row: max(row["Mean"], 0) / summa, axis = 1)
                 
                 self.featureImportanceDataCollection[trainingSet][ind] = subset
         
         self.uniqueLabels = list(set(self.allLabels))
+        
+        ###
+        self.labelPoints = dict(zip(self.uniqueLabels, [0]*len(self.uniqueLabels)))
+        for key in self.uniqueLabels:
+            for row,trainingSet in enumerate(list(self.featureImportanceDataCollection)):
+                for col, predictor in enumerate(list(self.featureImportanceDataCollection[trainingSet])):
+                    dataframe = self.featureImportanceDataCollection[trainingSet][predictor]
+                    
+                    if key in dataframe.index:
+                        self.labelPoints[key] += dataframe.loc[key]["points"]
+                        
+        self.labelPoints = pandas.Series(self.labelPoints).sort_values().to_dict()
+        ###
+        self.labelRelative = dict(zip(self.uniqueLabels, [1]*len(self.uniqueLabels)))
+        
+        self.zeros = dict(zip(self.uniqueLabels, [0]*len(self.uniqueLabels)))
+        for key in self.uniqueLabels:
+            for row,trainingSet in enumerate(list(self.featureImportanceDataCollection)):
+                for col, predictor in enumerate(list(self.featureImportanceDataCollection[trainingSet])):
+                    dataframe = self.featureImportanceDataCollection[trainingSet][predictor]
+                    
+                    if key in dataframe.index:
+                        relative = dataframe.loc[key]["relativeImportance"]
+                        if relative < Data.getEpsilon():
+                            relative = 1
+                            self.zeros[key] += 1
+                        self.labelRelative[key] *= relative
+        
+        ###
+        relativeCombined = pandas.DataFrame.from_dict(self.labelRelative, orient="index", columns = ["relativeCombined"])
+        zeros = pandas.DataFrame.from_dict(self.zeros, orient="index", columns = ["zeros"])
+        labelOrder = pandas.concat((relativeCombined, zeros), axis = 1)
+        
+        self.labelRelative = []
+        self.labelCategorised = []
+        for zeroAmount in set(labelOrder["zeros"].values):
+            subdf = labelOrder[labelOrder["zeros"] == zeroAmount].sort_values(by="relativeCombined", ascending = False)
+            self.labelCategorised.append(subdf)
+            self.labelRelative += list(subdf.index.values)
+        
+        ###
+        
+        self.labelCategorised = pandas.concat(self.labelCategorised)
+        
+        self.labelCategorised["mathLabel"] = self.labelCategorised.apply(lambda row: PlotTweak.getMathLabel(row.name), axis = 1)
+        
+        # print(self.labelCategorised)
+        print(self.labelCategorised.to_latex(columns =["mathLabel", "relativeCombined", "zeros"], index =False))
+        ###
+        
+        self.uniqueLabels = self.labelRelative
+        
         self._getColorsForLabels()
         
         for trainingSet in self.featureImportanceDataCollection:
@@ -127,7 +186,6 @@ class ManuscriptFigures(EmulatorMetaData):
         
         
 
-
     def _initReadStats(self):
         self.statsCollection = {}
         for trainingSet in self.trainingSetList:
@@ -136,7 +194,12 @@ class ManuscriptFigures(EmulatorMetaData):
         self.anomalyLimits = pandas.read_csv( self.emulatorPostprosDataRootFolder / "anomalyLimits.csv", index_col = 0)
 
     def _getColorsForLabels(self):
-        self.uniqueColors =  Colorful.getIndyColorList( len(self.uniqueLabels) )
+        self.uniqueLabels = list(numpy.array(self.uniqueLabels).reshape(-1,self.legendCols).T.reshape(-1,1).ravel())
+        
+        self.uniqueColors = [ PlotTweak.getLabelColor( label ) for label in self.uniqueLabels ]
+        
+        
+        
         
         self.labelColors = dict(zip(self.uniqueLabels, self.uniqueColors))
         
@@ -163,15 +226,17 @@ class ManuscriptFigures(EmulatorMetaData):
         grey = Colorful.getDistinctColorList("grey")
         
         maksimi = 0
-        
+        column = "relativeImportance"
         for row,trainingSet in enumerate(list(self.featureImportanceDataCollection)):
             for col, predictor in enumerate(list(self.featureImportanceDataCollection[trainingSet])):
                 
-                dataframe = self.featureImportanceDataCollection[trainingSet][predictor].sort_values(by="Mean", ascending=False)
-                maksimi = max(dataframe["Mean"].max(), maksimi)
+                dataframe = self.featureImportanceDataCollection[trainingSet][predictor]
+                
+                maksimi = max(dataframe[column].max(), maksimi)
                 ax = fig.getAxesGridPoint( {"row": row, "col": col})
                 
-                dataframe.plot(ax=ax, kind="bar",color=dataframe["color"], x="mathLabel", y = "Mean", legend = False)
+                dataframe.plot(ax=ax, kind="bar",color=dataframe["color"], x="mathLabel", y = column, legend = False)
+                
         
                 
         
@@ -198,13 +263,13 @@ class ManuscriptFigures(EmulatorMetaData):
                 ax.text(PlotTweak.getXPosition(ax, -0.24), PlotTweak.getYPosition(ax, 0.),
                             PlotTweak.getLatexLabel(self.traininSetSensibleNames[ind//ncols]), size=8 , rotation =90)
             if ind == 0:
-                ax.text(1, 1.3, "Emulator", size=8)
+                ax.text(PlotTweak.getXPosition(ax, 0.2), PlotTweak.getYPosition(ax, 1.05), "Emulator", size=8)
             if ind == 1:
-                ax.text(1,1.3, "Corrected linear fit", size=8)
+                ax.text(PlotTweak.getXPosition(ax, 0.2),PlotTweak.getYPosition(ax, 1.05), "Corrected linear fit", size=8)
 
         fig.getAxes(-1).legend(handles=PlotTweak.getPatches(self.mathLabelColors),
                       loc=(-0.9,-1.59),
-                      ncol = 4,
+                      ncol = self.legendCols,
                       fontsize = 8)
 
     def figureLeaveOneOut(self):
