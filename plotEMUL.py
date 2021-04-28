@@ -172,7 +172,7 @@ class ManuscriptFigures(EmulatorMetaData):
         self.labelCategorised["mathLabel"] = self.labelCategorised.apply(lambda row: PlotTweak.getMathLabel(row.name), axis = 1)
         
         # print(self.labelCategorised)
-        print(self.labelCategorised.to_latex(columns =["mathLabel", "relativeCombined", "zeros"], index =False))
+        
         ###
         
         self.uniqueLabels = self.labelRelative
@@ -272,82 +272,6 @@ class ManuscriptFigures(EmulatorMetaData):
                       ncol = self.legendCols,
                       fontsize = 8)
 
-    def figureLeaveOneOut(self):
-
-
-        self.figures["figureLeaveOneOut"] = Figure(self.figureFolder,"figureLeaveOneOut",
-                                                   figsize = [4.724409448818897, 4],  ncols = 2, nrows = 2,
-                                                   bottom = 0.12, hspace = 0.08, wspace=0.04, top=0.98)
-        fig = self.figures["figureLeaveOneOut"]
-
-        end = 1.0
-        ticks = numpy.arange(0, end + .01, 0.1)
-        tickLabels = [f"{t:.1f}" for t in ticks]
-
-        showList = Data.cycleBoolean(len(ticks))
-
-        showList[-1] = False
-
-        for ind,trainingSet in enumerate(self.trainingSetList):
-            ax = fig.getAxes(ind)
-
-            dataframe = self.completeDataFrame[trainingSet]
-
-            dataframe = dataframe.loc[dataframe[self.filterIndex]]
-
-
-            simulated = dataframe[self.responseVariable]
-
-            statistics = self.statsCollection[trainingSet].loc["leaveOneOutStats"]
-
-            slope = statistics["slope"]
-            intercept = statistics["intercept"]
-            rSquared = statistics["rSquared"]
-
-
-            dataframe.plot.scatter(ax = ax, x=self.responseVariable, y=self.emulatedVariable,alpha=0.3)
-
-            coef = [slope, intercept]
-            poly1d_fn = numpy.poly1d(coef)
-            ax.plot(simulated.values, poly1d_fn(simulated.values), color = "k")
-
-            ax.set_ylim([0, end])
-
-            ax.set_xlim([0, end])
-
-
-            PlotTweak.setAnnotation(ax, self.annotationCollection[trainingSet],
-                                    xPosition=ax.get_xlim()[1]*0.05, yPosition = ax.get_ylim()[1]*0.90)
-
-            PlotTweak.setAnnotation(ax, PlotTweak.getLatexLabel(f"R^2={rSquared:.2f}",""), xPosition=0.5, yPosition=0.1, bbox_props = None)
-
-            PlotTweak.setXaxisLabel(ax,"")
-            PlotTweak.setYaxisLabel(ax,"")
-
-            if ind == 0:
-                legendLabelColors = []
-
-            if ind in [2,3]:
-
-
-                ax.set_xticks(ticks)
-                ax.set_xticklabels(tickLabels)
-                PlotTweak.hideLabels(ax.xaxis, showList)
-            else:
-                PlotTweak.hideXTickLabels(ax)
-
-            if ind in [0,2]:
-                ax.set_yticks(ticks)
-                ax.set_yticklabels(tickLabels)
-                PlotTweak.hideLabels(ax.yaxis, showList)
-            else:
-
-                PlotTweak.hideYTickLabels(ax)
-
-            if ind == 2:
-                ax.text(0.5,-0.25, PlotTweak.getUnitLabel("Simulated\ w_{pos}", "m\ s^{-1}"), size=8)
-            if ind == 0:
-                ax.text(-0.25,-0.5, PlotTweak.getUnitLabel("Emulated\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
     
     
     def figureMethodsVsSimuted(self):
@@ -1060,6 +984,8 @@ class ManuscriptFigures(EmulatorMetaData):
                 ax.text(-0.55,-80, PlotTweak.getLatexLabel("Number\ of\ points"), size=8 , rotation =90)
                 PlotTweak.setArtist(ax, {"Updraft from emulator": emulColor, "Updraft from linear fit" : linFitColor}, loc = (0.07, 1.05), ncol = 2)
 
+    def tables_featureImportanceOrder(self):
+        self.labelCategorised.to_latex(self.figureFolder / "featureImportanceOrder.tex", columns =["mathLabel", "relativeCombined", "zeros"], index =False)
 
 def main():
 
@@ -1070,8 +996,7 @@ def main():
     if True:
         figObject.initReadFeatureImportanceData()
         figObject.figureBarFeatureImportanceData()
-    if False:
-        figObject.figureLeaveOneOut()
+        figObject.tables_featureImportanceOrder()
     if False:
         figObject.figureUpdraftLinearFit()
     if False:
