@@ -438,81 +438,7 @@ class ManuscriptFigures(EmulatorMetaData):
                         PlotTweak.getUnitLabel("Predicted\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
             if ind == 10:
                 ax.text(-0.1,-0.27,PlotTweak.getUnitLabel("Simulated\ w_{pos}", "m\ s^{-1}") , size=8)
-                
-            
-    def analyseLinearFit(self):
-        condition = {}
-        updraftVariableName = self.responseVariable
-
-        data = {}
-        
-
-        variables = ["q_inv", "tpot_inv", "lwp", "tpot_pbl", "pblh", "cos_mu", "pblh_m", "prcp", "wpos", "w2pos", "drflx", "lwpEndValue", "lwpRelativeChange", "cfracEndValue", "cloudTopRelativeChange"]
-
-        for column in variables:
-            data[column + "_Inside_min"] = []
-            data[column + "_Inside_max"] = []
-            data[column + "_Outlier_min"] = []
-            data[column + "_Outlier_max"] = []
-
-
-        for ind,trainingSet in enumerate(self.trainingSetList):
-            dataframe = self.completeDataFrameFiltered[trainingSet]
-
-            slope, intercept, r_value, p_value, std_err = stats.linregress(dataframe["drflx"], dataframe["w2pos"])
-
-            rSquared = numpy.power(r_value, 2)
-
-
-
-            condition["notMatchObservation"] = ~ ( (dataframe[updraftVariableName] > dataframe["drflx"]*self.observationParameters["slope"]+ self.observationParameters["intercept"]-self.observationParameters["error"]) & (dataframe[updraftVariableName] < dataframe["drflx"]*self.observationParameters["slope"]+ self.observationParameters["intercept"]+self.observationParameters["error"]))
-
-            dataFrameInside = dataframe[ ~condition["notMatchObservation"]]
-
-            slopeInside, interceptInside, r_valueInside, p_valueInside, std_errInside = stats.linregress(dataFrameInside["drflx"], dataFrameInside["w2pos"])
-
-            rSquaredInside = numpy.power(r_valueInside, 2)
-
-            print(f"{trainingSet}, all R^2: {rSquared:.2f}, #: {dataframe.shape[0]}; inside R^2: {rSquaredInside:.2f} #: {dataFrameInside.shape[0]}")
-
-            for column in variables:
-
-                try:
-                    minimiOutlier = float(dataframe.loc[ condition["notMatchObservation"] ][column].min())
-                except (TypeError, ValueError, KeyError):
-                    minimiOutlier = -8888.
-                try:
-                    maksimiOutlier = float(dataframe.loc[ condition["notMatchObservation"] ][column].max())
-                except (TypeError, ValueError, KeyError):
-                    maksimiOutlier = -8888.
-
-                try:
-                    minimiInside = float(dataframe.loc[ ~ condition["notMatchObservation"] ][column].min())
-                except (TypeError, ValueError, KeyError):
-                    minimiInside = -8888.
-                try:
-                    maksimiInside = float(dataframe.loc[~ condition["notMatchObservation"] ][column].max())
-                except (TypeError, ValueError, KeyError):
-                    maksimiInside = -8888.
-
-                data[ column + "_Inside_min"].append(minimiInside)
-                data[ column + "_Inside_max"].append(maksimiInside)
-
-                data[ column + "_Outlier_min"].append(minimiOutlier)
-                data[ column + "_Outlier_max"].append(maksimiOutlier)
-
-                if minimiOutlier < minimiInside:
-                    print(f"{trainingSet} {column} minimi smaller outside")
-                if maksimiOutlier > maksimiInside:
-                    print(f"{trainingSet} {column} maksimi greater outside")
-
-
-                # print(f"{trainingSet:11}{column:33} Inside: {minimiInside:.2f}{maksimiInside:.2f} Outlier: {minimiOutlier:.2f}{maksimiOutlier:.2f}")
-        df = pandas.DataFrame(data, index = self.trainingSetList)
-
-        df.to_csv("/home/aholaj/Data/EmulatorManuscriptDataW2Pos/analyseLinearfit.csv")
-
-
+                            
 
     def figureUpdraftLinearFit(self):
 
@@ -532,13 +458,19 @@ class ManuscriptFigures(EmulatorMetaData):
         yShowList = Data.cycleBoolean(len(yticks))
 
         color_obs = Colorful.getDistinctColorList("grey")
-
+        condition = {}
         for ind,trainingSet in enumerate(self.trainingSetList):
             ax = fig.getAxes(ind)
 
             dataframe = self.completeDataFrameFiltered[trainingSet]
 
             updraftVariableName = self.responseVariable
+            
+            condition["notMatchObservation"] = ~ ( (dataframe[updraftVariableName] > dataframe["drflx"]*self.observationParameters["slope"]+ self.observationParameters["intercept"]-self.observationParameters["error"]) &\
+                                                   (dataframe[updraftVariableName] < dataframe["drflx"]*self.observationParameters["slope"]+ self.observationParameters["intercept"]+self.observationParameters["error"]))
+
+            dataFrameInside = dataframe[ ~condition["notMatchObservation"]]
+            percentageInside = len(dataFrameInside) / len(dataframe) *100.
 
             radiativeWarming  = dataframe["drflx"].values
             updraft =  dataframe[updraftVariableName].values
@@ -593,11 +525,12 @@ class ManuscriptFigures(EmulatorMetaData):
 
                 ax.add_artist(artist)
 
-            ax.text(-30, 0.75,
-                PlotTweak.getLatexLabel("y=a + b * x") + "\n" + \
-                                         PlotTweak.getLatexLabel(f"a={intercept:.4f}") + "\n" + \
-                                             PlotTweak.getLatexLabel(f"b={slope:.6f}") + "\n" + \
-                                           PlotTweak.getLatexLabel(f"R^2={rSquared:.2f}"), fontsize = 6)
+            ax.text(-25, 0.67,
+                f"""{PlotTweak.getLatexLabel('y=a + b * x')}
+{PlotTweak.getLatexLabel(f'a={intercept:.4f}')}
+{PlotTweak.getLatexLabel(f'b={slope:.6f}')}
+{PlotTweak.getLatexLabel(f'R^2={rSquared:.2f}')}
+{PlotTweak.getLatexLabel('p_{in}=' + f'{percentageInside:.1f}')}%""", fontsize = 6)
 
             ax.set_yticks(yticks)
             ax.set_yticklabels(tickLabels)
