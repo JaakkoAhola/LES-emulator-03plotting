@@ -223,8 +223,6 @@ class ManuscriptFigures(EmulatorMetaData):
                                                             hspace=0.8, bottom=0.20, wspace = 0.05, top = 0.97)
         fig = self.figures["figureFeatureImportanceBar"]
 
-        grey = Colorful.getDistinctColorList("grey")
-        
         maksimi = 0
         column = "relativeImportance"
         for row,trainingSet in enumerate(list(self.featureImportanceDataCollection)):
@@ -278,7 +276,7 @@ class ManuscriptFigures(EmulatorMetaData):
         numberOfMethods = 3
         self.figures["figureMethodsVsSimuted"] = Figure(self.figureFolder,"figureMethodsVsSimuted",
                                                    figsize = [4.724409448818897, 7],  ncols = numberOfMethods, nrows = 4,
-                                                   bottom = 0.07, hspace = 0.09, wspace=0.09, top=0.95, left=0.16, right = 0.98)
+                                                   bottom = 0.07, hspace = 0.09, wspace=0.10, top=0.95, left=0.16, right = 0.98)
         fig = self.figures["figureMethodsVsSimuted"]
         
         print("figureMethodsVsSimuted")
@@ -294,127 +292,71 @@ class ManuscriptFigures(EmulatorMetaData):
         showList[-1] = False
         
         
-                
-        
-        emulatorColor = Colorful.getDistinctColorList("blue")
-        linearColor = Colorful.getDistinctColorList("red")
-        correctedColor = Colorful.getDistinctColorList("green")
-        
+        self.predictionVariableList
+        predictorColors = {"emulator" : Colorful.getDistinctColorList("blue"),
+                           "linearFit" : Colorful.getDistinctColorList("red"),
+                           "correctedLinearFit" : Colorful.getDistinctColorList("green")}
+        predictorStatsColumns = list(predictorColors)        
         rSquaredList = numpy.zeros(12)
         
         ncol = 0 # emulator
-        for setInd,trainingSet in enumerate(self.trainingSetList):
-            ind = ncol + numberOfMethods*setInd
-            ax = fig.getAxes(ind)
-
-            dataframe = self.completeDataFrame[trainingSet]
-
-            dataframe = dataframe.loc[dataframe[self.filterIndex]]
-
-
-            simulated = dataframe[self.responseVariable]
-
-            statistics = self.statsCollection[trainingSet].loc["leaveOneOutStats"]
-
-            slope = statistics["slope"]
-            intercept = statistics["intercept"]
-            rSquared = statistics["rSquared"]
-
-            rSquaredList[ind] = rSquared
-
-            dataframe.plot.scatter(ax = ax, x=self.responseVariable, y=self.emulatedVariable,color = emulatorColor, alpha=0.3)
-
-            coef = [slope, intercept]
-            poly1d_fn = numpy.poly1d(coef)
-            ax.plot(simulated.values, poly1d_fn(simulated.values), color = "k")
-
-
-            
-
-            PlotTweak.setXaxisLabel(ax,"")
-            PlotTweak.setYaxisLabel(ax,"")
-        
-        ncol+=1 # linear fit
-        for setInd,trainingSet in enumerate(self.trainingSetList):
-            ind = ncol + numberOfMethods*setInd
-            ax = fig.getAxes(ind)
-
-            dataframe = self.completeDataFrameFiltered[trainingSet]
-            simulatedFit = dataframe[self.responseVariable]
-            fittedFit = dataframe[self.linearFitVariable]
-
-            slopeFit, interceptFit, r_valueFit, p_valueFit, std_errFit = stats.linregress(simulatedFit, fittedFit)
-
-            rSquaredFit = numpy.power(r_valueFit,2)
-            
-            rSquaredList[ind] = rSquaredFit
-
-            coefFit = [slopeFit, interceptFit]
-
-            fitColor = "k"
-            
-            dataframe.plot.scatter(ax=ax, x=self.responseVariable, y=self.linearFitVariable, alpha = 0.3, color=linearColor)
-
-            poly1d_fn = numpy.poly1d(coefFit)
-
-            ax.plot(simulatedFit.values, poly1d_fn(simulatedFit.values), color = fitColor)
-            
-        ncol += 1 # corrected linear fit
-        for setInd,trainingSet in enumerate(self.trainingSetList):
-            ind = ncol + numberOfMethods*setInd
-            ax = fig.getAxes(ind)
-
-            dataframe = self.completeDataFrame[trainingSet]
-
-            dataframe = dataframe.loc[dataframe[self.filterIndex]]
-
-            simulated =  dataframe[ self.responseVariable ].values
-            
-            # statistics = self.statsCollection[trainingSet].loc["correctedLinearFitStats"]
-
-            # slope = statistics["slope"]
-            # intercept = statistics["intercept"]
-            # rSquared = statistics["rSquared"]
-            corrected = dataframe[ self.correctedLinearFitVariable ].values
-            simulated =  dataframe[ self.responseVariable ].values
-            
-            slope, intercept, r_value, p_value, std_err = stats.linregress(simulated, corrected)
-
-            rSquared = numpy.power(r_value, 2)
-            
-            rSquaredList[ind] = rSquared
-
-            dataframe.plot.scatter(ax = ax, x=self.responseVariable, y=self.correctedLinearFitVariable, alpha=0.3, color = correctedColor)
-
-            coef = [slope, intercept]
-            poly1d_fn = numpy.poly1d(coef)
-            ax.plot(simulated, poly1d_fn(simulated), color = "k")
-
+        for row,trainingSet in enumerate(self.trainingSetList):
+            for col, predictor in enumerate(self.predictionVariableList):
+                
+                ax = fig.getAxesGridPoint( {"row": row, "col": col})
+                shortname = predictorStatsColumns[col]
+                dataframe = self.completeDataFrame[trainingSet]
     
+                dataframe = dataframe.loc[dataframe[self.filterIndex]]
+    
+                simulated = dataframe[self.responseVariable]
+    
+                statistics = self.statsCollection[trainingSet].loc[ predictorStatsColumns[col] ]
+    
+                slope = statistics["slope"]
+                intercept = statistics["intercept"]
+                rSquared = statistics["rSquared"]
+                rmse = statistics["rmse"]
+    
+    
+                dataframe.plot.scatter(ax = ax, x=self.responseVariable, y=predictor,color = predictorColors[ shortname ], alpha=0.3)
+    
+                coef = [slope, intercept]
+                poly1d_fn = numpy.poly1d(coef)
+                ax.plot(simulated.values, poly1d_fn(simulated.values), color = "k")
+
+                ax.set_ylim([start, end])
+
+                ax.set_xlim([start, end])
+    
+                
+                PlotTweak.setAnnotation(ax, f"""{PlotTweak.getLatexLabel(f'R^2={rSquared:.2f}','')}
+{PlotTweak.getLatexLabel(f'RMSE={rmse:.3f}','')}""",
+                                        xPosition=0.28, yPosition=0.05, bbox_props = None)
+                
+                PlotTweak.setXaxisLabel(ax,"")
+                PlotTweak.setYaxisLabel(ax,"")
+                
+                
+                
+                
+                ax.set_xticks(ticks)
+                ax.set_xticklabels(tickLabels)
+                PlotTweak.hideLabels(ax.xaxis, showList)
+                
+                ax.set_yticks(ticks)
+                ax.set_yticklabels(tickLabels)
+                PlotTweak.hideLabels(ax.yaxis, showList)
+                
+                PlotTweak.setXTickSizes(ax, Data.cycleBoolean(len(ticks)))
+                PlotTweak.setYTickSizes(ax, Data.cycleBoolean(len(ticks)))
+        
+            
         for ind in range(12):
             ax = fig.getAxes(ind)
-            ax.set_ylim([start, end])
-
-            ax.set_xlim([start, end])
-
+            
             PlotTweak.setAnnotation(ax, f"({Data.getNthLetter(ind)})",
-                                    xPosition=ax.get_xlim()[1]*0.05, yPosition = ax.get_ylim()[1]*0.90)
-            
-            PlotTweak.setAnnotation(ax, PlotTweak.getLatexLabel(f"R^2={rSquaredList[ind]:.2f}",""), xPosition=0.5, yPosition=0.1, bbox_props = None)
-            
-            PlotTweak.setXaxisLabel(ax,"")
-            PlotTweak.setYaxisLabel(ax,"")
-            
-            PlotTweak.setXTickSizes(ax, Data.cycleBoolean(len(ticks)))
-            PlotTweak.setYTickSizes(ax, Data.cycleBoolean(len(ticks)))
-            
-            ax.set_xticks(ticks)
-            ax.set_xticklabels(tickLabels)
-            PlotTweak.hideLabels(ax.xaxis, showList)
-            
-            ax.set_yticks(ticks)
-            ax.set_yticklabels(tickLabels)
-            PlotTweak.hideLabels(ax.yaxis, showList)
+                                        xPosition=ax.get_xlim()[1]*0.05, yPosition = ax.get_ylim()[1]*0.90)
             
             if ind not in numpy.asarray(range(4))*3:
                 PlotTweak.hideYTickLabels(ax)
@@ -426,7 +368,7 @@ class ManuscriptFigures(EmulatorMetaData):
                 PlotTweak.hideXTickLabels(ax)
                 
             if ind == 1:
-                collectionOfLabelsColors = {"Emulator": emulatorColor, "Linear Fit" : linearColor, "Corr. Lin. Fit" : correctedColor}
+                collectionOfLabelsColors = {"Emulator": predictorColors["emulator"], "Linear Fit" : predictorColors["linearFit"], "Corr. Lin. Fit" : predictorColors["correctedLinearFit"]}
                 legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
 
                 artist = ax.legend( handles=legendLabelColors, loc=(-.9, 1.05), frameon = True, framealpha = 1.0, ncol = 3 )
@@ -563,24 +505,16 @@ def main():
                                   "/home/aholaj/Nextcloud/000_WORK/000_ARTIKKELIT/02_LES-Emulator/001_Manuscript_LES_emulator/figures",
                                   "/home/aholaj/mounttauskansiot/puhtiwork/EmulatorManuscriptData/phase02.yaml")
 
-    if False:
+    if True:
         figObject.initReadFeatureImportanceData()
         figObject.figureBarFeatureImportanceData()
         figObject.tables_featureImportanceOrder()
     if True:
         figObject.figureUpdraftLinearFit()
-    if False:
-        figObject.figureUpdraftCorrectedLinearFit()
-    if False:
-        figObject.figureUpdraftLinearFitVSEMul()
-
-    if False:
+    if True:
         figObject.figureMethodsVsSimuted()
 
     figObject.finalise()
-
-    # figObject.analyseLinearFitPercentile()
-    # figObject.analyseLinearFit()
 
 if __name__ == "__main__":
     start = time.time()
