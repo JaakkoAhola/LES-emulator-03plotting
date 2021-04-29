@@ -512,66 +512,13 @@ class ManuscriptFigures(EmulatorMetaData):
 
         df.to_csv("/home/aholaj/Data/EmulatorManuscriptDataW2Pos/analyseLinearfit.csv")
 
-    def analyseLinearFitPercentile(self):
-        condition = {}
-        updraftVariableName = self.responseVariable
 
-        data = {}
-
-        variables = ["q_inv", "tpot_inv", "lwp", "tpot_pbl", "pblh", "cos_mu", "pblh_m", "prcp", "wpos", "w2pos", "drflx", "lwpEndValue", "lwpRelativeChange", "cfracEndValue", "cloudTopRelativeChange"]
-        tailPercentile = 0.05
-        for column in variables:
-            data[column + "_Inside_low_tail"] = []
-            data[column + "_Inside_high_tail"] = []
-            data[column + "_Outlier_low_tail"] = []
-            data[column + "_Outlier_high_tail"] = []
-
-        print("Percentile")
-        for ind,trainingSet in enumerate(self.trainingSetList):
-            dataframe = self.completeDataFrameFiltered[trainingSet]
-            condition["notMatchObservation"] = ~ ( (dataframe[updraftVariableName] > dataframe["drflx"]*self.observationParameters["slope"]+ self.observationParameters["intercept"]-self.observationParameters["error"]) & (dataframe[updraftVariableName] < dataframe["drflx"]*self.observationParameters["slope"]+ self.observationParameters["intercept"]+self.observationParameters["error"]))
-            for column in variables:
-
-                try:
-                    minimiOutlier = float(dataframe.loc[ condition["notMatchObservation"] ][column].quantile( tailPercentile ))
-                except (TypeError, ValueError, KeyError):
-                    minimiOutlier = -8888.
-                try:
-                    maksimiOutlier = float(dataframe.loc[ condition["notMatchObservation"] ][column].quantile(1- tailPercentile ))
-                except (TypeError, ValueError, KeyError):
-                    maksimiOutlier = -8888.
-
-                try:
-                    minimiInside = float(dataframe.loc[ ~ condition["notMatchObservation"] ][column].quantile( tailPercentile ))
-                except (TypeError, ValueError, KeyError):
-                    minimiInside = -8888.
-                try:
-                    maksimiInside = float(dataframe.loc[~ condition["notMatchObservation"] ][column].quantile(1- tailPercentile ))
-                except (TypeError, ValueError, KeyError):
-                    maksimiInside = -8888.
-
-                data[ column + "_Inside_low_tail"].append(minimiInside)
-                data[ column + "_Inside_high_tail"].append(maksimiInside)
-
-                data[ column + "_Outlier_low_tail"].append(minimiOutlier)
-                data[ column + "_Outlier_high_tail"].append(maksimiOutlier)
-
-                if minimiOutlier < minimiInside:
-                    print(f"{trainingSet} {column} low tail smaller outside")
-                if maksimiOutlier > maksimiInside:
-                    print(f"{trainingSet} {column} high tail greater outside")
-
-
-                # print(f"{trainingSet:11}{column:33} Inside: {minimiInside:.2f}{maksimiInside:.2f} Outlier: {minimiOutlier:.2f}{maksimiOutlier:.2f}")
-        df = pandas.DataFrame(data, index = self.trainingSetList)
-
-        df.to_csv("/home/aholaj/Data/EmulatorManuscriptDataW2Pos/analyseLinearfitPercentile.csv")
 
     def figureUpdraftLinearFit(self):
 
 
         self.figures["figureLinearFit"] = Figure(self.figureFolder,"figureLinearFit", figsize = [4.724409448818897, 4],
-                                                 ncols = 2, nrows = 2, bottom = 0.11, hspace = 0.08, wspace=0.12, top=0.95)
+                                                 ncols = 2, nrows = 2, bottom = 0.11, hspace = 0.08, wspace=0.12, top=0.94)
         fig = self.figures["figureLinearFit"]
 
         xstart = -140
@@ -625,7 +572,7 @@ class ManuscriptFigures(EmulatorMetaData):
 
 
             PlotTweak.setAnnotation(ax, self.annotationCollection[trainingSet],
-                                    xPosition=PlotTweak.getXPosition(ax, 0.02), yPosition = PlotTweak.getYPosition(ax, 0.94))
+                                    xPosition=PlotTweak.getXPosition(ax, 0.02), yPosition = PlotTweak.getYPosition(ax, 0.93))
 
             PlotTweak.setXaxisLabel(ax,"")
             PlotTweak.setYaxisLabel(ax,"")
@@ -670,322 +617,12 @@ class ManuscriptFigures(EmulatorMetaData):
             if ind == 2:
                 ax.text(0.3,-0.25, PlotTweak.getUnitLabel("Cloud\ rad.\ warming", "W\ m^{-2}"), size=8)
                 
-    def figureUpdraftCorrectedLinearFit(self):
 
-        self.figures["figureCorrectedLinearFit"] = Figure(self.figureFolder,"figureCorrectedLinearFit",
-                                                          figsize = [4.724409448818897, 4],  ncols = 2, nrows = 2,
-                                                   bottom = 0.12, hspace = 0.08, wspace=0.04, top=0.95)
-        fig = self.figures["figureCorrectedLinearFit"]
-        
-        end = 1.0
-        ticks = numpy.arange(0, end + .01, 0.1)
-        tickLabels = [f"{t:.1f}" for t in ticks]
 
-        showList = Data.cycleBoolean(len(ticks))
 
-        showList[-1] = False
-        
-        correctedColor = Colorful.getDistinctColorList("green")
-
-        for ind,trainingSet in enumerate(self.trainingSetList):
-            ax = fig.getAxes(ind)
-
-            dataframe = self.completeDataFrame[trainingSet]
-
-            dataframe = dataframe.loc[dataframe[self.filterIndex]]
-
-
-            # statistics = self.statsCollection[trainingSet].loc["correctedLinearFitStats"]
-
-            # slope = statistics["slope"]
-            # intercept = statistics["intercept"]
-            # rSquared = statistics["rSquared"]
-
-            corrected = dataframe[ self.correctedLinearFitVariable ].values
-            simulated =  dataframe[ self.responseVariable ].values
-            
-            slope, intercept, r_value, p_value, std_err = stats.linregress(simulated, corrected)
-
-            rSquared = numpy.power(r_value, 2)
-
-
-            dataframe.plot.scatter(ax = ax, x=self.responseVariable, y=self.correctedLinearFitVariable, alpha=0.3, color = correctedColor)
-
-
-            coef = [slope, intercept]
-            poly1d_fn = numpy.poly1d(coef)
-            ax.plot(simulated, poly1d_fn(simulated), color = "k")
-
-            ax.set_ylim([0, end])
-
-            ax.set_xlim([0, end])
-
-
-            PlotTweak.setAnnotation(ax, self.annotationCollection[trainingSet],
-                                    xPosition=ax.get_xlim()[1]*0.05, yPosition = ax.get_ylim()[1]*0.90)
-
-            PlotTweak.setAnnotation(ax, PlotTweak.getLatexLabel(f"R^2={rSquared:.2f}",""), xPosition=0.5, yPosition=0.1, bbox_props = None)
-
-            PlotTweak.setXaxisLabel(ax,"")
-            PlotTweak.setYaxisLabel(ax,"")
-
-            if ind == 0:
-                legendLabelColors = []
-
-            if ind in [2,3]:
-
-
-                ax.set_xticks(ticks)
-                ax.set_xticklabels(tickLabels)
-                PlotTweak.hideLabels(ax.xaxis, showList)
-            else:
-                PlotTweak.hideXTickLabels(ax)
-
-            if ind in [0,2]:
-                ax.set_yticks(ticks)
-                ax.set_yticklabels(tickLabels)
-                PlotTweak.hideLabels(ax.yaxis, showList)
-            else:
-
-                PlotTweak.hideYTickLabels(ax)
-
-            if ind == 2:
-                ax.text(0.5,-0.25, PlotTweak.getUnitLabel("Simulated\ w_{pos}", "m\ s^{-1}"), size=8)
-            if ind == 0:
-                ax.text(-0.25,-0.5, PlotTweak.getUnitLabel("Corrected\ Linear\ Fit\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
-        
-        
-
-    def figureUpdraftLinearFitVSEMul(self):
-        self.figures["figureLinearFitComparison"] = Figure(self.figureFolder,"figureLinearFitComparison", figsize = [4.724409448818897, 4.5],
-                     ncols = 2, nrows = 2, bottom = 0.11, hspace = 0.08, wspace=0.12, top=0.86)
-        fig = self.figures["figureLinearFitComparison"]
-        # xticks = numpy.arange(0, xend + 1, 10)
-
-        start = 0.0
-        end = 1.0
-        ticks = numpy.arange(0, end + .01, 0.1)
-        tickLabels = [f"{t:.1f}" for t in ticks]
-
-        showList = Data.cycleBoolean(len(ticks))
-
-        showList[-1] = False
-
-        for ind,trainingSet in enumerate(self.trainingSetList):
-            ax = fig.getAxes(ind)
-
-            dataframe = self.completeDataFrameFiltered[trainingSet]
-            simulatedFit = dataframe[self.responseVariable]
-            fittedFit = dataframe[self.linearFitVariable]
-
-            slopeFit, interceptFit, r_valueFit, p_valueFit, std_errFit = stats.linregress(simulatedFit, fittedFit)
-
-            rSquaredFit = numpy.power(r_valueFit,2)
-
-
-            coefFit = [slopeFit, interceptFit]
-
-
-            fitColor = "k"
-            dataColor = Colorful.getDistinctColorList("red")
-
-            tempAnomalies = dataframe.loc[dataframe["tpot_inv_low_tail"]]
-            cloudTopAnomalies = dataframe.loc[dataframe["cloudTopRelativeChange_high_tail"]]
-            lwpAnomalies = dataframe.loc[dataframe["lwpRelativeChange_high_tail"]]
-
-            dataframe.plot.scatter(ax=ax, x=self.responseVariable, y=self.linearFitVariable, alpha = 0.3, color=dataColor)
-
-            dataframeAnomalies = cloudTopAnomalies
-            dataframeAnomalies.plot.scatter(ax = ax, x=self.responseVariable, y=self.linearFitVariable, color = self.cloudTopColor, marker = "x", linewidth = 1)
-
-            dataframeAnomalies = tempAnomalies
-            dataframeAnomalies.plot.scatter(ax = ax, x=self.responseVariable, y=self.linearFitVariable, color = self.tempColor, marker = "|", linewidth = 1)
-
-            dataframeAnomalies = lwpAnomalies
-            dataframeAnomalies.plot.scatter(ax = ax, x=self.responseVariable, y=self.linearFitVariable, color = self.lwpColor, marker = "_", linewidth = 1)
-
-            poly1d_fn = numpy.poly1d(coefFit)
-
-            ax.plot(simulatedFit.values, poly1d_fn(simulatedFit.values), color = fitColor)
-
-
-            ax.set_xlim([start, end])
-            ax.set_ylim([start, end])
-
-
-            PlotTweak.setAnnotation(ax, self.annotationCollection[trainingSet],
-                                    xPosition=ax.get_xlim()[1]*0.05, yPosition = ax.get_ylim()[1]*0.90)
-
-            PlotTweak.setAnnotation(ax, PlotTweak.getLatexLabel(f"R^2={rSquaredFit:.2f}",""), xPosition=0.5, yPosition=0.1, bbox_props = None)
-
-            PlotTweak.setAnnotation(ax, self.annotationCollection[trainingSet],
-                                    xPosition=PlotTweak.getXPosition(ax, 0.05), yPosition = PlotTweak.getYPosition(ax, 0.9))
-
-            PlotTweak.setXaxisLabel(ax,"")
-            PlotTweak.setYaxisLabel(ax,"")
-
-
-            PlotTweak.setXTickSizes(ax, showList)
-
-
-            ax.set_xticks(ticks)
-            ax.set_xticklabels(tickLabels)
-            PlotTweak.hideLabels(ax.xaxis, showList)
-
-            if ind == 0:
-                collectionOfLabelsColors = {"Simulated data": dataColor, "Fit" : "k"}
-                legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
-
-                legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.cloudTopColor, marker='x', markersize = 12, linestyle='None',
-                          label='Cloud top rel. change >' + str(self.anomalyLimits.loc["cloudTopRelativeChange"]["high"])))
-                legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.lwpColor, marker='_', markersize = 12, linestyle="None",
-                          label='LWP rel. change >' + str(self.anomalyLimits.loc["lwpRelativeChange"]["high"])))
-                legendLabelColors.append(matplotlib.lines.Line2D([], [], color=self.tempColor, marker='|', markersize = 12, linestyle='None',
-                          label=r"$\Delta {\theta_{L}} < $" + str(self.anomalyLimits.loc["tpot_inv"]["low"])))
-                legendLabelColors.append(None)
-
-
-                legendLabelColors = list(numpy.asarray(legendLabelColors).reshape(3,2).T.flatten())
-                # print(legendLabelColors)
-                legendLabelColors.pop(-1)
-                # print(legendLabelColors)
-                artist = ax.legend( handles=legendLabelColors, loc=(0.17, 1.05), frameon = True, framealpha = 1.0, ncol = 2 )
-
-                ax.add_artist(artist)
-
-            ax.set_yticks(ticks)
-            ax.set_yticklabels(tickLabels)
-            PlotTweak.setYTickSizes(ax, showList)
-            PlotTweak.hideLabels(ax.yaxis, showList)
-
-
-
-            if ind in [1,3]:
-                PlotTweak.hideYTickLabels(ax)
-            if ind in [0,1]:
-                PlotTweak.hideXTickLabels(ax)
-
-            if ind == 2:
-                ax.text(0.5,-.25, PlotTweak.getUnitLabel("Updraft\ from\ emulator", "m\ s^{-1}"), size=8)
-            if ind == 0:
-                ax.text(PlotTweak.getXPosition(ax, -0.27), PlotTweak.getYPosition(ax, -0.4), PlotTweak.getUnitLabel("Updraft\ from\ linear\ fit", "m\ s^{-1}"), size=8 , rotation =90)
-
-    def figureDistributionOfUpdrafts(self):
-        self.figures["figureDistributionOfUpdrafts"] = Figure(self.figureFolder, "figureDistributionOfUpdrafts", ncols = 2, nrows = 2)
-
-        fig = self.figures["figureDistributionOfUpdrafts"]
-
-        for ind, trainingSet in enumerate(self.trainingSetList):
-            ax = fig.getAxes(ind)
-
-            dataframe = self.completeDataFrameFiltered[trainingSet]
-
-
-            dataframe[self.responseVariable].plot.hist(ax=ax, bins = 20, color = "r",  style='--', alpha = 0.5 )
-
-    def figureWposVSWposWeighted(self):
-        self.figures["figureWposVSWposWeighted"] = Figure(self.figureFolder, "figureWposVSWposWeighted", ncols = 2, nrows = 2)
-
-        fig = self.figures["figureWposVSWposWeighted"]
-
-        for ind, trainingSet in enumerate(self.trainingSetList):
-            ax = fig.getAxes(ind)
-
-            dataframe = self.completeDataFrame[trainingSet]
-
-            dataframe.plot.scatter(ax=ax, x = "wpos", y="wposWeighted")
-
-
-    def figureErrorDistribution(self):
-        self.figures["figureErrorDistribution"] = Figure(self.figureFolder,"figureErrorDistribution",  ncols = 2, nrows = 2,
-                     bottom = 0.15, hspace = 0.08, wspace=0.04, top=0.90)
-        fig = self.figures["figureErrorDistribution"]
-
-        mini = None
-        maxi = None
-        ymaxi = None
-        xticks = numpy.arange(-0.4, 0.21, 0.1)
-        xtickLabels = [f"{t:.1f}" for t in xticks]
-        xshowList = Data.cycleBoolean(len(xticks))
-        xshowList[-1] = False
-
-        yticks = numpy.arange(0, 141, 10)
-        ytickLabels = [f"{t:d}" for t in yticks]
-        yshowList = Data.getMaskedList(yticks, numpy.arange(0,141,50))
-
-        emulColor = Colorful.getDistinctColorList("blue")
-        linFitColor = Colorful.getDistinctColorList("red")
-        for ind,trainingSet in enumerate(self.trainingSetList):
-            ax = fig.getAxes(ind)
-
-            dataframe = self.completeDataFrameFiltered[trainingSet]
-
-            emulRMSE = sqrt(mean_squared_error(dataframe[self.responseVariable], dataframe[self.emulatedVariable]))
-
-
-            dataframe["absErrorEmul"].plot.hist(ax=ax, bins = 20, color = emulColor,  style='--', alpha = 0.5 )
-
-            if mini is None:
-                mini = dataframe["absErrorEmul"].min()
-            else:
-                mini = min(mini, dataframe["absErrorEmul"].min())
-
-            if maxi is None:
-                maxi = dataframe["absErrorEmul"].max()
-            else:
-                maxi = max(maxi,  dataframe["absErrorEmul"].min())
-
-
-            linfitRMSE = sqrt(mean_squared_error(dataframe[self.responseVariable], dataframe[self.linearFitVariable]))
-
-            dataframe["absErrorLinearFit"].plot.hist(ax=ax, bins = 20, color = linFitColor, style='--', alpha = 0.5 )
-
-            mini = min(mini, dataframe["absErrorLinearFit"].min())
-            maxi = max(maxi, dataframe["absErrorLinearFit"].max())
-
-            if ymaxi is None:
-                ymaxi = ax.get_ylim()[1]
-            else:
-                ymaxi = max(ymaxi, ax.get_ylim()[1])
-
-            stringi = f"RMS errors:\nEmulated: {emulRMSE:.4f}"
-            stringi = stringi + f"\nLinear Fit: {linfitRMSE:.4f}"
-            PlotTweak.setAnnotation(ax, stringi,
-                                    xPosition=-0.39, yPosition=60, bbox_props = None)
-
-            ax.set_xlim([xticks[0], xticks[-1]])
-            ax.set_ylim([0, yticks[-1]])
-            PlotTweak.setXaxisLabel(ax,"")
-            PlotTweak.setYaxisLabel(ax,"")
-
-            PlotTweak.setAnnotation(ax, self.annotationCollection[trainingSet],
-                                    xPosition=(ax.get_xlim()[1]-ax.get_xlim()[0])*0.02 + ax.get_xlim()[0], yPosition = ax.get_ylim()[1]*0.89)
-
-            if ind in [2,3]:
-                ax.set_xticks(xticks)
-                ax.set_xticklabels(xtickLabels)
-                PlotTweak.hideLabels(ax.xaxis, xshowList)
-                PlotTweak.setXTickSizes(ax, xshowList)
-            else:
-                PlotTweak.hideXTickLabels(ax)
-
-            if ind in [0,2]:
-                ax.set_yticks(yticks)
-                ax.set_yticklabels(ytickLabels)
-                PlotTweak.hideLabels(ax.yaxis, yshowList)
-                PlotTweak.setYTickSizes(ax, yshowList)
-            else:
-
-                PlotTweak.hideYTickLabels(ax)
-
-            if ind == 2:
-                ax.text(-0.3,-50, PlotTweak.getUnitLabel("Error,\ w-w_{LES},\ for\ predicting\ updraft\ velocity", "m\ s^{-1}"), size=8)
-            if ind == 0:
-                ax.text(-0.55,-80, PlotTweak.getLatexLabel("Number\ of\ points"), size=8 , rotation =90)
-                PlotTweak.setArtist(ax, {"Updraft from emulator": emulColor, "Updraft from linear fit" : linFitColor}, loc = (0.07, 1.05), ncol = 2)
 
     def tables_featureImportanceOrder(self):
-        self.labelCategorised.to_latex(self.figureFolder / "featureImportanceOrder.tex", columns =["mathLabel", "relativeCombined", "zeros"], index =False)
+        self.labelCategorised.to_latex(self.figureFolder / "featureImportanceOrder.tex", columns =["mathLabel", "relativeCombined", "zeros"], index =False, float_format="{:.2e}")
 
 def main():
 
@@ -993,22 +630,17 @@ def main():
                                   "/home/aholaj/Nextcloud/000_WORK/000_ARTIKKELIT/02_LES-Emulator/001_Manuscript_LES_emulator/figures",
                                   "/home/aholaj/mounttauskansiot/puhtiwork/EmulatorManuscriptData/phase02.yaml")
 
-    if True:
+    if False:
         figObject.initReadFeatureImportanceData()
         figObject.figureBarFeatureImportanceData()
         figObject.tables_featureImportanceOrder()
-    if False:
+    if True:
         figObject.figureUpdraftLinearFit()
     if False:
         figObject.figureUpdraftCorrectedLinearFit()
     if False:
         figObject.figureUpdraftLinearFitVSEMul()
-    if False:
-        figObject.figureErrorDistribution()
-    if False:
-        figObject.figureDistributionOfUpdrafts()
-    if False:
-        figObject.figureWposVSWposWeighted()
+
     if False:
         figObject.figureMethodsVsSimuted()
 
