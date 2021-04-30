@@ -92,6 +92,8 @@ class ManuscriptFigures(EmulatorMetaData):
         self._initReadStats()
 
         self._initReadLimits()
+        
+        self._initBootstraps()
 
     def _initReadCompleteData(self):
         self.completeDataFrame = {}
@@ -198,6 +200,12 @@ class ManuscriptFigures(EmulatorMetaData):
         self.statsCollection = {}
         for trainingSet in self.trainingSetList:
             self.statsCollection[trainingSet] = pandas.read_csv( self.emulatorPostprosDataRootFolder / trainingSet / ( trainingSet + "_stats.csv" ), index_col = 0  )
+            
+    def _initBootstraps(self):
+        self.bootstrapCollection = {}
+        for trainingSet in self.trainingSetList:
+            self.bootstrapCollection[trainingSet] = pandas.read_csv( self.emulatorPostprosDataRootFolder / trainingSet / ( trainingSet + "_bootstrap.csv" ), index_col = 0  )
+            
     def _initReadLimits(self):
         self.anomalyLimits = pandas.read_csv( self.emulatorPostprosDataRootFolder / "anomalyLimits.csv", index_col = 0)
 
@@ -514,7 +522,7 @@ class ManuscriptFigures(EmulatorMetaData):
                                  ["mathLabel", "relativeCombined", "zeros"])
                 
     def tables_predictorsVsSimulated(self):
-        for row,trainingSet in enumerate(self.trainingSetList):
+        for trainingSet in self.trainingSetList:
             statistics = self.statsCollection[trainingSet].loc[ self.predictorStatsColumns ]
             
             statistics["Predictor"] = self.predictorClearNames
@@ -524,8 +532,12 @@ class ManuscriptFigures(EmulatorMetaData):
                                      ["Predictor", "rSquared","r_value", "rmse"],
                                      float_format="{:.3f}".format)
             
-    def __latexTableWrapper(self, table, fileName, columns, float_format = "{:.2e}".format):
-        table.to_latex(self.tableFolder / (fileName + ".tex"), columns = columns, index = False, float_format=float_format)
+    def tables_bootstraps(self):
+        for trainingSet in self.trainingSetList:
+            self.__latexTableWrapper( self.bootstrapCollection[trainingSet], f"Bootstrap_{trainingSet}", columns = None, float_format = "{:.3f}".format, index = True)
+            
+    def __latexTableWrapper(self, table, fileName, columns, float_format = "{:.2e}".format, index = False):
+        table.to_latex(self.tableFolder / (fileName + ".tex"), columns = columns, index = index, float_format=float_format)
     
     def finaliseLatexTables(self):
         for texFile in self.tableFolder.glob("**/*.tex"):
@@ -563,6 +575,10 @@ class ManuscriptFigures(EmulatorMetaData):
                     line = line.replace("linearFit", "Linear fit")
                     line = line.replace("correctedLinearFit", "Corr. Lin. fit")
                     
+                    line = line.replace("\\_Mean", " mean")
+                    line = line.replace("\\_Std", " std")
+                    
+                    
                     linesToBeWritten.append(line)
             texFile.unlink()
             with open(texFile, "w") as writeFile:
@@ -589,6 +605,9 @@ def main():
     if True:
         figObject.figurePredictorsVsSimulated()
         figObject.tables_predictorsVsSimulated()
+    
+    if True:
+        figObject.tables_bootstraps()
         
     figObject.finalise()
     figObject.finaliseLatexTables()
