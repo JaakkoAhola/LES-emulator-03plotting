@@ -33,7 +33,8 @@ from EmulatorMetaData import EmulatorMetaData
 
 class ManuscriptFigures(EmulatorMetaData):
 
-    def __init__(self, emulatorPostprosDataRootFolder, figureFolder, configFile):
+    def __init__(self, folders : dict,
+                 configFile):
         
         self.responseIndicatorVariable = "responseIndicator"
         
@@ -47,12 +48,13 @@ class ManuscriptFigures(EmulatorMetaData):
                                "LVL4Night",
                                "LVL4Day"]
 
-        self.emulatorPostprosDataRootFolder = pathlib.Path(emulatorPostprosDataRootFolder)
-        self.figureFolder = pathlib.Path(figureFolder)
-
+        self.emulatorPostprosDataRootFolder = pathlib.Path(folders["simulationData"])
+        
+        self.figureFolder = pathlib.Path(folders["figures"])
         self.figureFolder.mkdir( parents=True, exist_ok = True )
 
-
+        self.tableFolder = pathlib.Path(folders["tables"])
+        self.tableFolder.mkdir( parents=True, exist_ok = True )
 
         self.annotationValues = ["(a) SB Night",
             "(b) SB Day",
@@ -75,7 +77,13 @@ class ManuscriptFigures(EmulatorMetaData):
         self.observationParameters["intercept"] = 22.30/100.
         self.observationParameters["error"] = 13./100.
 
-
+        
+        self.predictorColors = {"emulator" : Colorful.getDistinctColorList("blue"),
+                           "linearFit" : Colorful.getDistinctColorList("red"),
+                           "correctedLinearFit" : Colorful.getDistinctColorList("green")}
+        self.predictorStatsColumns = list(self.predictorColors)        
+        
+        self.predictorClearNames = dict(zip(self.predictorStatsColumns, ["Emulator", "Linear Fit", "Corr. Lin. Fit"]))
 
         self._initReadCompleteData()
 
@@ -272,14 +280,12 @@ class ManuscriptFigures(EmulatorMetaData):
 
     
     
-    def figureMethodsVsSimuted(self):
+    def figurePredictorsVsSimulated(self):
         numberOfMethods = 3
-        self.figures["figureMethodsVsSimuted"] = Figure(self.figureFolder,"figureMethodsVsSimuted",
+        self.figures["figurePredictorsVsSimulated"] = Figure(self.figureFolder,"figurePredictorsVsSimulated",
                                                    figsize = [4.724409448818897, 7],  ncols = numberOfMethods, nrows = 4,
                                                    bottom = 0.07, hspace = 0.09, wspace=0.10, top=0.95, left=0.16, right = 0.98)
-        fig = self.figures["figureMethodsVsSimuted"]
-        
-        print("figureMethodsVsSimuted")
+        fig = self.figures["figurePredictorsVsSimulated"]
         
         start = 0.0
         end = 1.0
@@ -291,27 +297,18 @@ class ManuscriptFigures(EmulatorMetaData):
         showList[0] = False
         showList[-1] = False
         
-        
-        self.predictionVariableList
-        predictorColors = {"emulator" : Colorful.getDistinctColorList("blue"),
-                           "linearFit" : Colorful.getDistinctColorList("red"),
-                           "correctedLinearFit" : Colorful.getDistinctColorList("green")}
-        predictorStatsColumns = list(predictorColors)        
-        rSquaredList = numpy.zeros(12)
-        
-        ncol = 0 # emulator
         for row,trainingSet in enumerate(self.trainingSetList):
             for col, predictor in enumerate(self.predictionVariableList):
                 
                 ax = fig.getAxesGridPoint( {"row": row, "col": col})
-                shortname = predictorStatsColumns[col]
+                shortname = self.predictorStatsColumns[col]
                 dataframe = self.completeDataFrame[trainingSet]
     
                 dataframe = dataframe.loc[dataframe[self.filterIndex]]
     
                 simulated = dataframe[self.responseVariable]
     
-                statistics = self.statsCollection[trainingSet].loc[ predictorStatsColumns[col] ]
+                statistics = self.statsCollection[trainingSet].loc[ self.predictorStatsColumns[col] ]
     
                 slope = statistics["slope"]
                 intercept = statistics["intercept"]
@@ -319,7 +316,7 @@ class ManuscriptFigures(EmulatorMetaData):
                 rmse = statistics["rmse"]
     
     
-                dataframe.plot.scatter(ax = ax, x=self.responseVariable, y=predictor,color = predictorColors[ shortname ], alpha=0.3)
+                dataframe.plot.scatter(ax = ax, x=self.responseVariable, y=predictor,color = self.predictorColors[ shortname ], alpha=0.3)
     
                 coef = [slope, intercept]
                 poly1d_fn = numpy.poly1d(coef)
@@ -368,7 +365,7 @@ class ManuscriptFigures(EmulatorMetaData):
                 PlotTweak.hideXTickLabels(ax)
                 
             if ind == 1:
-                collectionOfLabelsColors = {"Emulator": predictorColors["emulator"], "Linear Fit" : predictorColors["linearFit"], "Corr. Lin. Fit" : predictorColors["correctedLinearFit"]}
+                collectionOfLabelsColors = {"Emulator": self.predictorColors["emulator"], "Linear Fit" : self.predictorColors["linearFit"], "Corr. Lin. Fit" : self.predictorColors["correctedLinearFit"]}
                 legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
 
                 artist = ax.legend( handles=legendLabelColors, loc=(-.9, 1.05), frameon = True, framealpha = 1.0, ncol = 3 )
@@ -380,14 +377,21 @@ class ManuscriptFigures(EmulatorMetaData):
                         PlotTweak.getUnitLabel("Predicted\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
             if ind == 10:
                 ax.text(-0.1,-0.27,PlotTweak.getUnitLabel("Simulated\ w_{pos}", "m\ s^{-1}") , size=8)
-                            
 
-    def figureUpdraftLinearFit(self):
+    def figureSimulatedUpdraft_vs_CloudRadiativeWarming(self):
+        self.__figureUpdraft_vs_CloudRadiativeWarming(self.responseVariable, {"fig" : "figureSimulatedUpdraft_vs_CloudRadiativeWarming", "legend" : "Simulated"}, Colorful.getDistinctColorList("orange"))
+    def figureLinearFitUpdraft_vs_CloudRadiativeWarming(self):
+        self.__figureUpdraft_vs_CloudRadiativeWarming(self.linearFitVariable, {"fig" : "figureLinearFitUpdraft_vs_CloudRadiativeWarming", "legend" : "Linear Fit"}, Colorful.getDistinctColorList("red"))
+        
+    def figureCorrectedLinearUpdraft_vs_CloudRadiativeWarming(self):
+        self.__figureUpdraft_vs_CloudRadiativeWarming(self.correctedLinearFitVariable, {"fig" : "figureCorrectedLinearUpdraft_vs_CloudRadiativeWarming", "legend" :"Corr. Lin. Fit"}, Colorful.getDistinctColorList("green"))
+        
+    def __figureUpdraft_vs_CloudRadiativeWarming(self, updraftVariableName, names : dict, dataColor):
 
 
-        self.figures["figureLinearFit"] = Figure(self.figureFolder,"figureLinearFit", figsize = [4.724409448818897, 4],
+        self.figures[names["fig"]] = Figure(self.figureFolder,names["fig"], figsize = [4.724409448818897, 4],
                                                  ncols = 2, nrows = 2, bottom = 0.11, hspace = 0.08, wspace=0.12, top=0.94)
-        fig = self.figures["figureLinearFit"]
+        fig = self.figures[names["fig"]]
 
         xstart = -140
         xend = 50
@@ -406,8 +410,6 @@ class ManuscriptFigures(EmulatorMetaData):
 
             dataframe = self.completeDataFrameFiltered[trainingSet]
 
-            updraftVariableName = self.responseVariable
-            
             condition["notMatchObservation"] = ~ ( (dataframe[updraftVariableName] > dataframe["drflx"]*self.observationParameters["slope"]+ self.observationParameters["intercept"]-self.observationParameters["error"]) &\
                                                    (dataframe[updraftVariableName] < dataframe["drflx"]*self.observationParameters["slope"]+ self.observationParameters["intercept"]+self.observationParameters["error"]))
 
@@ -428,7 +430,6 @@ class ManuscriptFigures(EmulatorMetaData):
             coef = [slope, intercept]
             rSquared = numpy.power(r_value, 2)
 
-            dataColor = Colorful.getDistinctColorList("red")
             fitColor = "k"
             dataframe.plot.scatter(ax = ax, x="drflx", y=updraftVariableName, alpha=0.3, color = dataColor)
 
@@ -460,7 +461,7 @@ class ManuscriptFigures(EmulatorMetaData):
 
 
             if ind == 0:
-                collectionOfLabelsColors = {"Simulated data": dataColor, "Fit" : "k", "Observations" : color_obs}
+                collectionOfLabelsColors = {names["legend"] : dataColor, "Fit" : "k", "Observations" : color_obs}
                 legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
 
                 artist = ax.legend( handles=legendLabelColors, loc=(0.17, 1.02), frameon = True, framealpha = 1.0, ncol = 3 )
@@ -488,7 +489,7 @@ class ManuscriptFigures(EmulatorMetaData):
                 PlotTweak.hideXTickLabels(ax)
             if ind == 0:
                 ax.text(PlotTweak.getXPosition(ax, -0.27), PlotTweak.getYPosition(ax, -0.5),
-                        PlotTweak.getUnitLabel("Simulated\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
+                        PlotTweak.getUnitLabel(names["legend"] + "\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
             if ind == 2:
                 ax.text(0.3,-0.25, PlotTweak.getUnitLabel("Cloud\ rad.\ warming", "W\ m^{-2}"), size=8)
                 
@@ -496,25 +497,101 @@ class ManuscriptFigures(EmulatorMetaData):
 
 
 
+    
+    def table_featureImportanceStats(self):
+        for trainingSet in self.featureImportanceDataCollection:
+            for predictor in self.featureImportanceDataCollection[trainingSet]:
+                
+                dataframe = self.featureImportanceDataCollection[trainingSet][predictor]
+                self.__latexTableWrapper(dataframe,
+                                         f"table_featureImportanceStats_{trainingSet}_{predictor.split('_')[-1]}",
+                                         ["mathLabel", "Mean", "Std", "relativeImportance"],
+                                         float_format="{:.3f}".format)
+    
     def tables_featureImportanceOrder(self):
-        self.labelCategorised.to_latex(self.figureFolder / "featureImportanceOrder.tex", columns =["mathLabel", "relativeCombined", "zeros"], index =False, float_format="{:.2e}")
+        self.__latexTableWrapper(self.labelCategorised,
+                                 "tables_featureImportanceOrder",
+                                 ["mathLabel", "relativeCombined", "zeros"])
+                
+    def tables_predictorsVsSimulated(self):
+        for row,trainingSet in enumerate(self.trainingSetList):
+            statistics = self.statsCollection[trainingSet].loc[ self.predictorStatsColumns ]
+            
+            statistics["Predictor"] = self.predictorClearNames
+            
+            self.__latexTableWrapper(statistics,
+                                     f"tables_predictorsVsSimulated_{trainingSet}",
+                                     ["Predictor", "rSquared","r_value", "rmse"],
+                                     float_format="{:.3f}".format)
+            
+    def __latexTableWrapper(self, table, fileName, columns, float_format = "{:.2e}".format):
+        table.to_latex(self.tableFolder / (fileName + ".tex"), columns = columns, index = False, float_format=float_format)
+    
+    def finaliseLatexTables(self):
+        for texFile in self.tableFolder.glob("**/*.tex"):
+            linesToBeWritten = []
+            with open(texFile, "r") as readFile:
+                for line in readFile:
+                    
+                    line = line.replace(" ", "")
+                    
+                    line = line.replace("toprule", "tophline")
+                    
+                    line = line.replace("midrule", "middlehline")
+                    line = line.replace("bottomrule", "bottomhline")
+                    
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{cos\\_\\{\\textbackslashmu\\}\\}\\{\\textbackslash\\}\\}\\$", "$cos_{\\mu}$")
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{N\\_\\{as\\}\\}\\{\\textbackslash\\}\\}\\$", "$N_{as}$")
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{N\\_\\{ks\\}\\}\\{\\textbackslash\\}\\}\\$", "$N_{ks}$")
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{N\\_\\{cs\\}\\}\\{\\textbackslash\\}\\}\\$", "$N_{cs}$")
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{w\\_\\{lin.fit\\}\\}\\{\\textbackslash\\}\\}\\$", "$w_{lin.fit}$")
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{\\{\\textbackslashtheta\\}\\_\\{L\\}\\}\\{\\textbackslash\\}\\}\\$", "${\\theta}_{L}$")
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{\\textbackslashDelta\\{\\textbackslashtheta\\}\\_\\{L\\}\\}\\{\\textbackslash\\}\\}\\$", "$\\Delta  {\\theta}_{L}$")
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{\\textbackslashDeltaq\\_\\{L\\}\\}\\{\\textbackslash\\}\\}\\$", "$\\Delta q_{L}$")
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{r\\_\\{eff\\}\\}\\{\\textbackslash\\}\\}\\$", "$r_{eff}$")
+                    
+                    
+                    line = line.replace("mathLabel", "Variable")
+                    line = line.replace("relativeCombined", "Product of relative permutation feature importances")
+                    line = line.replace("zeros", "Number of times relative importance equal to zero")
+                    line = line.replace("relativeImportance", "Relative permutation feature importance")
+                    
+                    line = line.replace("rSquared", "$R^2$")
+                    line = line.replace("r\\_value", "r")
+                    
+                    line = line.replace("emulator", "Emulator")
+                    line = line.replace("linearFit", "Linear fit")
+                    line = line.replace("correctedLinearFit", "Corr. Lin. fit")
+                    
+                    linesToBeWritten.append(line)
+            texFile.unlink()
+            with open(texFile, "w") as writeFile:
+                for line in linesToBeWritten:
+                    writeFile.write(line)
+                
 
 def main():
 
-    figObject = ManuscriptFigures("/home/aholaj/mounttauskansiot/puhtiwork/EmulatorManuscriptData",
-                                  "/home/aholaj/Nextcloud/000_WORK/000_ARTIKKELIT/02_LES-Emulator/001_Manuscript_LES_emulator/figures",
+    figObject = ManuscriptFigures({"simulationData" : "/home/aholaj/mounttauskansiot/puhtiwork/EmulatorManuscriptData",
+                                  "figures" : "/home/aholaj/Nextcloud/000_WORK/000_ARTIKKELIT/02_LES-Emulator/001_Manuscript_LES_emulator/figures",
+                                  "tables" : "/home/aholaj/Nextcloud/000_WORK/000_ARTIKKELIT/02_LES-Emulator/001_Manuscript_LES_emulator/tables"},
                                   "/home/aholaj/mounttauskansiot/puhtiwork/EmulatorManuscriptData/phase02.yaml")
 
     if True:
         figObject.initReadFeatureImportanceData()
         figObject.figureBarFeatureImportanceData()
         figObject.tables_featureImportanceOrder()
+        figObject.table_featureImportanceStats()
     if True:
-        figObject.figureUpdraftLinearFit()
+        figObject.figureSimulatedUpdraft_vs_CloudRadiativeWarming()
+        figObject.figureLinearFitUpdraft_vs_CloudRadiativeWarming()
+        figObject.figureCorrectedLinearUpdraft_vs_CloudRadiativeWarming()
     if True:
-        figObject.figureMethodsVsSimuted()
-
+        figObject.figurePredictorsVsSimulated()
+        figObject.tables_predictorsVsSimulated()
+        
     figObject.finalise()
+    figObject.finaliseLatexTables()
 
 if __name__ == "__main__":
     start = time.time()
