@@ -83,7 +83,7 @@ class ManuscriptFigures(EmulatorMetaData):
                            "emulator" : Colorful.getDistinctColorList("blue")}
         self.predictorStatsColumns = list(self.predictorColors)        
         
-        self.predictorClearNames = dict(zip(self.predictorStatsColumns, ["Linear Fit", "Corr. Lin. Fit", "Emulator"]))
+        self.predictorClearNames = dict(zip(self.predictorStatsColumns, ["Lin. Fit", "Lin. Fit + Random Forest", "Gaussian Process"]))
 
         self._initReadCompleteData()
 
@@ -277,9 +277,9 @@ class ManuscriptFigures(EmulatorMetaData):
                 ax.text(PlotTweak.getXPosition(ax, -0.24), PlotTweak.getYPosition(ax, 0.),
                             PlotTweak.getLatexLabel(self.traininSetSensibleNames[ind//ncols]), size=8 , rotation =90)
             if ind == 1:
-                ax.text(PlotTweak.getXPosition(ax, 0.2), PlotTweak.getYPosition(ax, 1.05), "Emulator", size=8)
+                ax.text(PlotTweak.getXPosition(ax, 0.2), PlotTweak.getYPosition(ax, 1.05), self.predictorClearNames["emulator"], size=8)
             if ind == 0:
-                ax.text(PlotTweak.getXPosition(ax, 0.2),PlotTweak.getYPosition(ax, 1.05), "Corrected linear fit", size=8)
+                ax.text(PlotTweak.getXPosition(ax, 0.2),PlotTweak.getYPosition(ax, 1.05), self.predictorClearNames["correctedLinearFit"], size=8)
 
         fig.getAxes(-1).legend(handles=PlotTweak.getPatches(self.mathLabelColors),
                       loc=(-0.9,-1.59),
@@ -371,11 +371,11 @@ class ManuscriptFigures(EmulatorMetaData):
             if ind not in list(range(9,12)):
                 PlotTweak.hideXTickLabels(ax)
                 
-            if ind == 1:
-                collectionOfLabelsColors = {"Linear Fit" : self.predictorColors["linearFit"], "Corr. Lin. Fit" : self.predictorColors["correctedLinearFit"], "Emulator": self.predictorColors["emulator"]}
+            if ind == 0:
+                collectionOfLabelsColors = dict(zip(list(self.predictorClearNames.values()), list(self.predictorColors.values())))
                 legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
 
-                artist = ax.legend( handles=legendLabelColors, loc=(-.9, 1.05), frameon = True, framealpha = 1.0, ncol = 3 )
+                artist = ax.legend( handles=legendLabelColors, loc=(-0.52, 1.05), frameon = True, framealpha = 1.0, ncol = 3 )
 
                 ax.add_artist(artist)
                 
