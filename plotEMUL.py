@@ -78,12 +78,12 @@ class ManuscriptFigures(EmulatorMetaData):
         self.observationParameters["error"] = 13./100.
 
         
-        self.predictorColors = {"emulator" : Colorful.getDistinctColorList("blue"),
-                           "linearFit" : Colorful.getDistinctColorList("red"),
-                           "correctedLinearFit" : Colorful.getDistinctColorList("green")}
+        self.predictorColors = {"linearFit" : Colorful.getDistinctColorList("red"),
+                           "correctedLinearFit" : Colorful.getDistinctColorList("green"),
+                           "emulator" : Colorful.getDistinctColorList("blue")}
         self.predictorStatsColumns = list(self.predictorColors)        
         
-        self.predictorClearNames = dict(zip(self.predictorStatsColumns, ["Emulator", "Linear Fit", "Corr. Lin. Fit"]))
+        self.predictorClearNames = dict(zip(self.predictorStatsColumns, ["Linear Fit", "Corr. Lin. Fit", "Emulator"]))
 
         self._initReadCompleteData()
 
@@ -242,7 +242,7 @@ class ManuscriptFigures(EmulatorMetaData):
         maksimi = 0
         column = "relativeImportance"
         for row,trainingSet in enumerate(list(self.featureImportanceDataCollection)):
-            for col, predictor in enumerate(list(self.featureImportanceDataCollection[trainingSet])):
+            for col, predictor in enumerate(list(self.featureImportanceDataCollection[trainingSet])[::-1]):
                 
                 dataframe = self.featureImportanceDataCollection[trainingSet][predictor]
                 
@@ -276,9 +276,9 @@ class ManuscriptFigures(EmulatorMetaData):
             else:
                 ax.text(PlotTweak.getXPosition(ax, -0.24), PlotTweak.getYPosition(ax, 0.),
                             PlotTweak.getLatexLabel(self.traininSetSensibleNames[ind//ncols]), size=8 , rotation =90)
-            if ind == 0:
-                ax.text(PlotTweak.getXPosition(ax, 0.2), PlotTweak.getYPosition(ax, 1.05), "Emulator", size=8)
             if ind == 1:
+                ax.text(PlotTweak.getXPosition(ax, 0.2), PlotTweak.getYPosition(ax, 1.05), "Emulator", size=8)
+            if ind == 0:
                 ax.text(PlotTweak.getXPosition(ax, 0.2),PlotTweak.getYPosition(ax, 1.05), "Corrected linear fit", size=8)
 
         fig.getAxes(-1).legend(handles=PlotTweak.getPatches(self.mathLabelColors),
@@ -307,7 +307,6 @@ class ManuscriptFigures(EmulatorMetaData):
         
         for row,trainingSet in enumerate(self.trainingSetList):
             for col, predictor in enumerate(self.predictionVariableList):
-                
                 ax = fig.getAxesGridPoint( {"row": row, "col": col})
                 shortname = self.predictorStatsColumns[col]
                 dataframe = self.completeDataFrame[trainingSet]
@@ -373,7 +372,7 @@ class ManuscriptFigures(EmulatorMetaData):
                 PlotTweak.hideXTickLabels(ax)
                 
             if ind == 1:
-                collectionOfLabelsColors = {"Emulator": self.predictorColors["emulator"], "Linear Fit" : self.predictorColors["linearFit"], "Corr. Lin. Fit" : self.predictorColors["correctedLinearFit"]}
+                collectionOfLabelsColors = {"Linear Fit" : self.predictorColors["linearFit"], "Corr. Lin. Fit" : self.predictorColors["correctedLinearFit"], "Emulator": self.predictorColors["emulator"]}
                 legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
 
                 artist = ax.legend( handles=legendLabelColors, loc=(-.9, 1.05), frameon = True, framealpha = 1.0, ncol = 3 )
@@ -569,7 +568,7 @@ class ManuscriptFigures(EmulatorMetaData):
                     line = line.replace("relativeImportance", "Relative permutation feature importance")
                     
                     line = line.replace("rSquared", "$R^2$")
-                    line = line.replace("r\\_value", "r")
+                    line = line.replace("r\\_value", "R")
                     
                     line = line.replace("emulator", "Emulator")
                     line = line.replace("linearFit", "Linear fit")
@@ -600,8 +599,8 @@ def main():
         figObject.table_featureImportanceStats()
     if True:
         figObject.figureSimulatedUpdraft_vs_CloudRadiativeWarming()
-        figObject.figureLinearFitUpdraft_vs_CloudRadiativeWarming()
-        figObject.figureCorrectedLinearUpdraft_vs_CloudRadiativeWarming()
+        
+        
     if True:
         figObject.figurePredictorsVsSimulated()
         figObject.tables_predictorsVsSimulated()
