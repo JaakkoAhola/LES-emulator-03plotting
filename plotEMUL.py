@@ -27,6 +27,7 @@ from PlotTweak import PlotTweak
 
 from sklearn.metrics import mean_squared_error
 from math import sqrt
+from math import ceil
 
 sys.path.append("../LES-emulator-02postpros")
 from EmulatorMetaData import EmulatorMetaData
@@ -42,11 +43,14 @@ class ManuscriptFigures(EmulatorMetaData):
         
         self.figures = {}
         
+        self.figureWidth = 12/2.54
     
         self.trainingSetList = ["LVL3Night",
                                "LVL3Day",
                                "LVL4Night",
                                "LVL4Day"]
+        
+        self.trainingSetColors = dict(zip(self.trainingSetList, Colorful.getDistinctColorList( ["blue", "cyan", "red", "orange"])))
 
         self.emulatorPostprosDataRootFolder = pathlib.Path(folders["simulationData"])
         
@@ -65,6 +69,8 @@ class ManuscriptFigures(EmulatorMetaData):
             "SB\ Day",
             "SALSA\ Night",
             "SALSA\ Day"]
+        
+        self.allSetColors = dict(zip([PlotTweak.getLatexLabel(name) for name in ["Filtered\ ECHAM"] + self.traininSetSensibleNames], [Colorful.getDistinctColorList("grey")] + list(self.trainingSetColors.values()) ))
 
         self.annotationCollection = dict(zip(self.trainingSetList, self.annotationValues))
 
@@ -194,8 +200,15 @@ class ManuscriptFigures(EmulatorMetaData):
                 subset  = self.featureImportanceDataCollection[trainingSet][predictor]
                 subset["color"] = subset.apply(lambda row: self.labelColors[row.name], axis = 1)
         
-        
 
+    def initReadFilteredSourceData(self):
+        localPath = pathlib.Path("/home/aholaj/ECLAIR")
+        if localPath.is_dir():
+            self.filteredSourceData = pandas.read_csv( localPath / "eclair_dataset_2001_designvariables.csv", index_col = 0 )
+            print("FilteredSourceData locally")
+        else:
+            self.filteredSourceData = pandas.read_csv( self.emulatorPostprosDataRootFolder / "eclair_dataset_2001.csv", index_col = 0 )
+    
     def _initReadStats(self):
         self.statsCollection = {}
         for trainingSet in self.trainingSetList:
@@ -234,7 +247,7 @@ class ManuscriptFigures(EmulatorMetaData):
         nrows = len(self.featureImportanceDataCollection) # = number of training sets
 
         self.figures["figureFeatureImportanceBar"] = Figure(self.figureFolder,"figureFeatureImportanceBar",
-                                                            figsize=(12/2.54,6), 
+                                                            figsize=[self.figureWidth,6], 
                                                             ncols = ncols, nrows = nrows,
                                                             hspace=0.8, bottom=0.20, wspace = 0.05, top = 0.97)
         fig = self.figures["figureFeatureImportanceBar"]
@@ -291,7 +304,7 @@ class ManuscriptFigures(EmulatorMetaData):
     def figurePredictorsVsSimulated(self):
         numberOfMethods = 3
         self.figures["figurePredictorsVsSimulated"] = Figure(self.figureFolder,"figurePredictorsVsSimulated",
-                                                   figsize = [4.724409448818897, 7],  ncols = numberOfMethods, nrows = 4,
+                                                   figsize = [self.figureWidth, 7],  ncols = numberOfMethods, nrows = 4,
                                                    bottom = 0.07, hspace = 0.09, wspace=0.10, top=0.95, left=0.16, right = 0.98)
         fig = self.figures["figurePredictorsVsSimulated"]
         
@@ -396,7 +409,7 @@ class ManuscriptFigures(EmulatorMetaData):
     def __figureUpdraft_vs_CloudRadiativeWarming(self, updraftVariableName, names : dict, dataColor):
 
 
-        self.figures[names["fig"]] = Figure(self.figureFolder,names["fig"], figsize = [4.724409448818897, 4],
+        self.figures[names["fig"]] = Figure(self.figureFolder,names["fig"], figsize = [self.figureWidth, 4],
                                                  ncols = 2, nrows = 2, bottom = 0.11, hspace = 0.08, wspace=0.12, top=0.94)
         fig = self.figures[names["fig"]]
 
@@ -503,7 +516,111 @@ class ManuscriptFigures(EmulatorMetaData):
 
 
 
+    def figureDesignVariables(self):
+        nrows = 4
+        ncols = ceil(len(self.designVariablePool) / nrows)
+        
+        self.figures["figureDesignVariables"] = Figure(self.figureFolder,"figureDesignVariables",
+                                                   figsize = [self.figureWidth, 7],  ncols = ncols, nrows = nrows,
+                                                   bottom = 0.04, hspace = 0.17, wspace=0.07, top=0.98, left=0.02, right = 0.98)
+        fig = self.figures["figureDesignVariables"]
+        rightUp = [0.57, 0.70]
+        leftUp = [0.25, 0.73]
+        leftDown = [0.1, 0]
+        rightDown = [0.45, 0.05]
+        middleDown = [0.33, 0.05]
+        default = [0.5,0.5]
+        specsPositions = [ [0.3, 0.05], [0.2, 0.05], [0.3,0.5], 
+                        [0.3,0.5], [0.3, 0.4], [0.3,0.5],
+                        [0.05, 0.50], [0.05, 0.50], [0.05, 0.50],
+                        [0.3, 0.05], middleDown
+                        ]
+        meanStr = "\mu"
+        stdStr = "\sigma"
+        # specsPositions = [ [0.44, 0.05], middleDown, default, 
+        #                 default, middleDown, default,
+        #                 default, default, default,
+        #                 default, middleDown
+        #                 ]
+        logVariables = ["ks", "as", "cs", "rdry_AS_eff"]
+        for ind,variable in enumerate(self.designVariablePool):
+            ax = fig.getAxes(ind)
+            
+            minimi = numpy.nan
+            maximi = numpy.nan
+            if variable == "pblh":
+                variableSourceName = "pbl"
+            else:
+                variableSourceName = variable
+            
+            if hasattr(self, "filteredSourceData"):
+                sourceDataVariable = self.filteredSourceData[variableSourceName]
+                sourceDataVariable = Data.dropInfNanFromDataFrame(sourceDataVariable)
+                if variable in logVariables:
+                    sourceDataVariable = numpy.log10(sourceDataVariable)
+                sourceDataVariable = Data.dropInfNanFromDataFrame(sourceDataVariable)
+                
+                if variable == "cos_mu":
+                    sourceDataVariable = sourceDataVariable[sourceDataVariable > Data.getEpsilon()]
+                sourceDataVariable.plot.density(ax = ax, color =Colorful.getDistinctColorList("grey"))
+                # minimi = numpy.nanmin([minimi, sourceDataVariable.min()])
+                # maximi = numpy.nanmax( [maximi, sourceDataVariable.max()])
+                
+                variableSpecs = f"""{PlotTweak.getLatexLabel(f'min={sourceDataVariable.min():.2f}')}
+{PlotTweak.getLatexLabel(f'{meanStr}={sourceDataVariable.mean():.2f}')}
+{PlotTweak.getLatexLabel(f'{stdStr}={sourceDataVariable.std():.2f}')}
+{PlotTweak.getLatexLabel(f'max={sourceDataVariable.max():.2f}')}"""
+                
+                # ax.text(specsPositions[ind][0], specsPositions[ind][1],
+                        # variableSpecs, fontsize = 8, transform=ax.transAxes)
+                ax.annotate( variableSpecs, xy=specsPositions[ind], size=8, bbox = dict(pad = 0.6, fc="w", ec="w", alpha=0.9), xycoords = "axes fraction")
+            
+            babba = True
+            for tt, trainingSet in enumerate(self.trainingSetList):
+                
+                if variable in self.completeDataFrame[trainingSet].keys():
+                    trainingSetVariable = self.completeDataFrame[trainingSet][variable]
+                    if variable in logVariables:
+                        loga = PlotTweak.getLatexLabel("log_{10} ")
+                        trainingSetVariable = numpy.log10(trainingSetVariable)
+                        trainingSetVariable = Data.dropInfNanFromDataFrame(trainingSetVariable)
+                    else:
+                        loga = ""
+                    
+                    minimi = numpy.nanmin([minimi, trainingSetVariable.min()])
+                    maximi = numpy.nanmax( [maximi, trainingSetVariable.max()])
+                    trainingSetVariable.plot.density(ax = ax, color = self.trainingSetColors[trainingSet])
+                    
+                    variableSpecs = f"""{PlotTweak.getLatexLabel(f'min={trainingSetVariable.min():.2f}')}
+{PlotTweak.getLatexLabel(f'{meanStr}={trainingSetVariable.mean():.2f}')}
+{PlotTweak.getLatexLabel(f'{stdStr}={trainingSetVariable.std():.2f}')}
+{PlotTweak.getLatexLabel(f'max={trainingSetVariable.max():.2f}')}"""
+                    
+                    if not hasattr(self, "filteredSourceData") and babba:
+                        # ax.text(specsPositions[ind][0], specsPositions[ind][1],
+                        # variableSpecs, fontsize = 8, transform=ax.transAxes)
+                        ax.annotate( variableSpecs, xy=specsPositions[ind], size=8, bbox = dict(pad = 0.6, fc="w", ec="w", alpha=0.9), xycoords = "axes fraction")
+                        babba = False
+                    
+            
+            annotation = f"({Data.getNthLetter(ind)}) {loga}{PlotTweak.getMathLabel(variable)}"
+            PlotTweak.setAnnotation(ax, annotation,
+                                    xPosition =  0.05,
+                                    yPosition = 0.9,
+                                    xycoords = "axes fraction") 
+            ax.set_ylabel("")
+            ax.set_xlim([minimi, maximi])
+            PlotTweak.hideYTickLabels(ax)
+        
+        ax = fig.getAxes(11)
+        ax.axis("off")
+        
+        legendLabelColors = PlotTweak.getPatches(self.allSetColors)
 
+        artist = ax.legend( handles=legendLabelColors, loc=(0.0, 0.00), frameon = True, framealpha = 1.0, ncol = 1 )
+
+        ax.add_artist(artist)
+        
     
     def table_featureImportanceStats(self):
         for trainingSet in self.featureImportanceDataCollection:
@@ -608,6 +725,11 @@ def main():
     if True:
         figObject.tables_bootstraps()
         
+    if True:
+        figObject.initReadFilteredSourceData()
+        figObject.figureDesignVariables()
+        
+        
     figObject.finalise()
     figObject.finaliseLatexTables()
 
@@ -615,4 +737,4 @@ if __name__ == "__main__":
     start = time.time()
     main()
     end = time.time()
-    print("Script completed in " + str(round((end - start),0)) + " seconds")
+    print(f"Script completed in {Data.timeDuration(end - start)}")
