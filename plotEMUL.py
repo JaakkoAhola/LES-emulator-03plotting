@@ -34,12 +34,9 @@ from EmulatorMetaData import EmulatorMetaData
 
 class ManuscriptFigures(EmulatorMetaData):
 
-    def __init__(self, folders : dict,
-                 configFile):
+    def __init__(self, locationsFile):
         
-        self.responseIndicatorVariable = "responseIndicator"
-        
-        super().__init__(configFile)
+        super().__init__(locationsFile)
         
         self.figures = {}
         
@@ -52,12 +49,9 @@ class ManuscriptFigures(EmulatorMetaData):
         
         self.trainingSetColors = dict(zip(self.trainingSetList, Colorful.getDistinctColorList( ["blue", "cyan", "red", "orange"])))
 
-        self.emulatorPostprosDataRootFolder = pathlib.Path(folders["simulationData"])
         
-        self.figureFolder = pathlib.Path(folders["figures"])
         self.figureFolder.mkdir( parents=True, exist_ok = True )
 
-        self.tableFolder = pathlib.Path(folders["tables"])
         self.tableFolder.mkdir( parents=True, exist_ok = True )
 
         self.annotationValues = ["(a) SB Night",
@@ -104,22 +98,41 @@ class ManuscriptFigures(EmulatorMetaData):
     def _initReadCompleteData(self):
         self.completeDataFrame = {}
         for trainingSet in self.trainingSetList:
-            self.completeDataFrame[trainingSet] = pandas.read_csv( self.emulatorPostprosDataRootFolder / trainingSet / ( trainingSet + "_complete.csv" ), index_col = 0  )
-
+            try:
+                self.completeDataFrame[trainingSet] = pandas.read_csv( self.postProsDataRootFolder / trainingSet / ( trainingSet + "_complete.csv" ), index_col = 0  )
+            except FileNotFoundError:
+                self.completeDataFrame[trainingSet] = None
+                
     def _filterCompleteData(self):
         self.completeDataFrameFiltered = {}
         for trainingSet in self.trainingSetList:
-            dataframe = self.completeDataFrame[trainingSet]
-            dataframe = dataframe.loc[ dataframe[self.filterIndex] ]
-            self.completeDataFrameFiltered[trainingSet] = dataframe
+            if self.completeDataFrame[trainingSet] is not None:
+                dataframe = self.completeDataFrame[trainingSet]
+                dataframe = dataframe.loc[ dataframe[self.filterIndex] ]
+                self.completeDataFrameFiltered[trainingSet] = dataframe
+            else:
+                self.completeDataFrameFiltered[trainingSet] = None
 
     def initReadFeatureImportanceData(self):
+
+        self._initReadFeatureImportanceData_phase01()
+        self._initReadFeatureImportanceData_phase02()
+        self._initReadFeatureImportanceData_phase03()
+        self._initReadFeatureImportanceData_phase04()
+        self._initReadFeatureImportanceData_phase05()
+
+    def _initReadFeatureImportanceData_phase01(self):
+        
         self.featureImportanceDataCollection = {}
         self.allLabels = []
         self.legendCols = 4
         for trainingSet in self.trainingSetList:
             self.featureImportanceDataCollection[trainingSet] = {}
-            dataset = pandas.read_csv( self.emulatorPostprosDataRootFolder / trainingSet / ( trainingSet + "_featureImportance.csv" ), index_col = 0 )
+            try:
+                dataset = pandas.read_csv( self.postProsDataRootFolder / trainingSet / ( trainingSet + "_featureImportance.csv" ), index_col = 0 )
+            except FileNotFoundError:
+                self.featureImportanceDataCollection[trainingSet] = None
+                continue
             for ind in dataset.index:
                 series = dataset.loc[ind]
                 mean = series.loc[[kk for kk in series.index if kk[-4:] == "Mean"]]
@@ -142,10 +155,12 @@ class ManuscriptFigures(EmulatorMetaData):
         
         self.uniqueLabels = list(set(self.allLabels))
         
-        ###
+    def _initReadFeatureImportanceData_phase02(self):
         self.labelPoints = dict(zip(self.uniqueLabels, [0]*len(self.uniqueLabels)))
         for key in self.uniqueLabels:
             for row,trainingSet in enumerate(list(self.featureImportanceDataCollection)):
+                if self.featureImportanceDataCollection[trainingSet] is None:
+                        continue
                 for col, predictor in enumerate(list(self.featureImportanceDataCollection[trainingSet])):
                     dataframe = self.featureImportanceDataCollection[trainingSet][predictor]
                     
@@ -153,13 +168,17 @@ class ManuscriptFigures(EmulatorMetaData):
                         self.labelPoints[key] += dataframe.loc[key]["points"]
                         
         self.labelPoints = pandas.Series(self.labelPoints).sort_values().to_dict()
-        ###
+    
+    def _initReadFeatureImportanceData_phase03(self):
         self.labelRelative = dict(zip(self.uniqueLabels, [1]*len(self.uniqueLabels)))
         
         self.zeros = dict(zip(self.uniqueLabels, [0]*len(self.uniqueLabels)))
         for key in self.uniqueLabels:
             for row,trainingSet in enumerate(list(self.featureImportanceDataCollection)):
+                if self.featureImportanceDataCollection[trainingSet] is None:
+                        continue
                 for col, predictor in enumerate(list(self.featureImportanceDataCollection[trainingSet])):
+                    
                     dataframe = self.featureImportanceDataCollection[trainingSet][predictor]
                     
                     if key in dataframe.index:
@@ -169,7 +188,7 @@ class ManuscriptFigures(EmulatorMetaData):
                             self.zeros[key] += 1
                         self.labelRelative[key] *= relative
         
-        ###
+    def _initReadFeatureImportanceData_phase04(self):
         relativeCombined = pandas.DataFrame.from_dict(self.labelRelative, orient="index", columns = ["relativeCombined"])
         zeros = pandas.DataFrame.from_dict(self.zeros, orient="index", columns = ["zeros"])
         labelOrder = pandas.concat((relativeCombined, zeros), axis = 1)
@@ -181,21 +200,19 @@ class ManuscriptFigures(EmulatorMetaData):
             self.labelCategorised.append(subdf)
             self.labelRelative += list(subdf.index.values)
         
-        ###
         
         self.labelCategorised = pandas.concat(self.labelCategorised)
         
         self.labelCategorised["mathLabel"] = self.labelCategorised.apply(lambda row: PlotTweak.getMathLabel(row.name), axis = 1)
         
-        # print(self.labelCategorised)
-        
-        ###
-        
+    def _initReadFeatureImportanceData_phase05(self):
         self.uniqueLabels = self.labelRelative
         
         self._getColorsForLabels()
         
         for trainingSet in self.featureImportanceDataCollection:
+            if self.featureImportanceDataCollection[trainingSet] is None:
+                continue
             for predictor in self.featureImportanceDataCollection[trainingSet]:
                 subset  = self.featureImportanceDataCollection[trainingSet][predictor]
                 subset["color"] = subset.apply(lambda row: self.labelColors[row.name], axis = 1)
@@ -204,23 +221,38 @@ class ManuscriptFigures(EmulatorMetaData):
     def initReadFilteredSourceData(self):
         localPath = pathlib.Path("/home/aholaj/ECLAIR")
         if localPath.is_dir():
-            self.filteredSourceData = pandas.read_csv( localPath / "eclair_dataset_2001_designvariables.csv", index_col = 0 )
-            print("FilteredSourceData locally")
+            try:
+                self.filteredSourceData = pandas.read_csv( localPath / "eclair_dataset_2001_designvariables.csv", index_col = 0 )
+                print("FilteredSourceData locally")
+            except FileNotFoundError:
+                self.filteredSourceData = None
         else:
-            self.filteredSourceData = pandas.read_csv( self.emulatorPostprosDataRootFolder / "eclair_dataset_2001.csv", index_col = 0 )
+            try:
+                self.filteredSourceData = pandas.read_csv( self.postProsDataRootFolder / "eclair_dataset_2001.csv", index_col = 0 )
+            except FileNotFoundError:
+                self.filteredSourceData = None
     
     def _initReadStats(self):
         self.statsCollection = {}
         for trainingSet in self.trainingSetList:
-            self.statsCollection[trainingSet] = pandas.read_csv( self.emulatorPostprosDataRootFolder / trainingSet / ( trainingSet + "_stats.csv" ), index_col = 0  )
+            try:
+                self.statsCollection[trainingSet] = pandas.read_csv( self.postProsDataRootFolder / trainingSet / ( trainingSet + "_stats.csv" ), index_col = 0  )
+            except FileNotFoundError:
+                self.statsCollection[trainingSet] = None
             
     def _initBootstraps(self):
         self.bootstrapCollection = {}
         for trainingSet in self.trainingSetList:
-            self.bootstrapCollection[trainingSet] = pandas.read_csv( self.emulatorPostprosDataRootFolder / trainingSet / ( trainingSet + "_bootstrap.csv" ), index_col = 0  )
+            try:
+                self.bootstrapCollection[trainingSet] = pandas.read_csv( self.postProsDataRootFolder / trainingSet / ( trainingSet + "_bootstrap.csv" ), index_col = 0  )
+            except FileNotFoundError:
+                self.bootstrapCollection[trainingSet] = None
             
     def _initReadLimits(self):
-        self.anomalyLimits = pandas.read_csv( self.emulatorPostprosDataRootFolder / "anomalyLimits.csv", index_col = 0)
+        try:
+            self.anomalyLimits = pandas.read_csv( self.postProsDataRootFolder / "anomalyLimits.csv", index_col = 0)
+        except FileNotFoundError:
+            self.anomalyLimits = None
 
     def _getColorsForLabels(self):
         self.uniqueLabels = list(numpy.array(self.uniqueLabels).reshape(-1,self.legendCols).T.reshape(-1,1).ravel())
@@ -255,6 +287,8 @@ class ManuscriptFigures(EmulatorMetaData):
         maksimi = 0
         column = "relativeImportance"
         for row,trainingSet in enumerate(list(self.featureImportanceDataCollection)):
+            if self.featureImportanceDataCollection[trainingSet] is None:
+                continue
             for col, predictor in enumerate(list(self.featureImportanceDataCollection[trainingSet])[::-1]):
                 
                 dataframe = self.featureImportanceDataCollection[trainingSet][predictor]
@@ -323,6 +357,8 @@ class ManuscriptFigures(EmulatorMetaData):
                 ax = fig.getAxesGridPoint( {"row": row, "col": col})
                 shortname = self.predictorStatsColumns[col]
                 dataframe = self.completeDataFrame[trainingSet]
+                if self.completeDataFrame[trainingSet] is None or self.statsCollection[trainingSet] is None:
+                    continue
     
                 dataframe = dataframe.loc[dataframe[self.filterIndex]]
     
@@ -429,6 +465,9 @@ class ManuscriptFigures(EmulatorMetaData):
             ax = fig.getAxes(ind)
 
             dataframe = self.completeDataFrameFiltered[trainingSet]
+            
+            if dataframe is None:
+                continue
 
             condition["notMatchObservation"] = ~ ( (dataframe[updraftVariableName] > dataframe["drflx"]*self.observationParameters["slope"]+ self.observationParameters["intercept"]-self.observationParameters["error"]) &\
                                                    (dataframe[updraftVariableName] < dataframe["drflx"]*self.observationParameters["slope"]+ self.observationParameters["intercept"]+self.observationParameters["error"]))
@@ -537,11 +576,7 @@ class ManuscriptFigures(EmulatorMetaData):
                         ]
         meanStr = "\mu"
         stdStr = "\sigma"
-        # specsPositions = [ [0.44, 0.05], middleDown, default, 
-        #                 default, middleDown, default,
-        #                 default, default, default,
-        #                 default, middleDown
-        #                 ]
+
         logVariables = ["ks", "as", "cs", "rdry_AS_eff"]
         for ind,variable in enumerate(self.designVariablePool):
             ax = fig.getAxes(ind)
@@ -553,7 +588,7 @@ class ManuscriptFigures(EmulatorMetaData):
             else:
                 variableSourceName = variable
             
-            if hasattr(self, "filteredSourceData"):
+            if hasattr(self, "filteredSourceData") and (self.filteredSourceData is not None):
                 sourceDataVariable = self.filteredSourceData[variableSourceName]
                 sourceDataVariable = Data.dropInfNanFromDataFrame(sourceDataVariable)
                 if variable in logVariables:
@@ -563,22 +598,22 @@ class ManuscriptFigures(EmulatorMetaData):
                 if variable == "cos_mu":
                     sourceDataVariable = sourceDataVariable[sourceDataVariable > Data.getEpsilon()]
                 sourceDataVariable.plot.density(ax = ax, color =Colorful.getDistinctColorList("grey"))
-                # minimi = numpy.nanmin([minimi, sourceDataVariable.min()])
-                # maximi = numpy.nanmax( [maximi, sourceDataVariable.max()])
                 
                 variableSpecs = f"""{PlotTweak.getLatexLabel(f'min={sourceDataVariable.min():.2f}')}
 {PlotTweak.getLatexLabel(f'{meanStr}={sourceDataVariable.mean():.2f}')}
 {PlotTweak.getLatexLabel(f'{stdStr}={sourceDataVariable.std():.2f}')}
 {PlotTweak.getLatexLabel(f'max={sourceDataVariable.max():.2f}')}"""
                 
-                # ax.text(specsPositions[ind][0], specsPositions[ind][1],
-                        # variableSpecs, fontsize = 8, transform=ax.transAxes)
                 ax.annotate( variableSpecs, xy=specsPositions[ind], size=8, bbox = dict(pad = 0.6, fc="w", ec="w", alpha=0.9), xycoords = "axes fraction")
             
-            babba = True
+            isAnnotated = True
             for tt, trainingSet in enumerate(self.trainingSetList):
                 
                 if variable in self.completeDataFrame[trainingSet].keys():
+                    
+                    if self.completeDataFrame[trainingSet] is None:
+                        continue
+                    
                     trainingSetVariable = self.completeDataFrame[trainingSet][variable]
                     if variable in logVariables:
                         loga = PlotTweak.getLatexLabel("log_{10} ")
@@ -596,11 +631,9 @@ class ManuscriptFigures(EmulatorMetaData):
 {PlotTweak.getLatexLabel(f'{stdStr}={trainingSetVariable.std():.2f}')}
 {PlotTweak.getLatexLabel(f'max={trainingSetVariable.max():.2f}')}"""
                     
-                    if not hasattr(self, "filteredSourceData") and babba:
-                        # ax.text(specsPositions[ind][0], specsPositions[ind][1],
-                        # variableSpecs, fontsize = 8, transform=ax.transAxes)
+                    if not hasattr(self, "filteredSourceData") and isAnnotated:
                         ax.annotate( variableSpecs, xy=specsPositions[ind], size=8, bbox = dict(pad = 0.6, fc="w", ec="w", alpha=0.9), xycoords = "axes fraction")
-                        babba = False
+                        isAnnotated = False
                     
             
             annotation = f"({Data.getNthLetter(ind)}) {loga}{PlotTweak.getMathLabel(variable)}"
@@ -624,6 +657,8 @@ class ManuscriptFigures(EmulatorMetaData):
     
     def table_featureImportanceStats(self):
         for trainingSet in self.featureImportanceDataCollection:
+            if self.featureImportanceDataCollection[trainingSet] is None:
+                continue
             for predictor in self.featureImportanceDataCollection[trainingSet]:
                 
                 dataframe = self.featureImportanceDataCollection[trainingSet][predictor]
@@ -639,6 +674,8 @@ class ManuscriptFigures(EmulatorMetaData):
                 
     def tables_predictorsVsSimulated(self):
         for trainingSet in self.trainingSetList:
+            if self.statsCollection[trainingSet] is None:
+                continue
             statistics = self.statsCollection[trainingSet].loc[ self.predictorStatsColumns ]
             
             statistics["Predictor"] = self.predictorClearNames
@@ -650,6 +687,8 @@ class ManuscriptFigures(EmulatorMetaData):
             
     def tables_bootstraps(self):
         for trainingSet in self.trainingSetList:
+            if self.bootstrapCollection[trainingSet] is None:
+                continue
             self.__latexTableWrapper( self.bootstrapCollection[trainingSet], f"Bootstrap_{trainingSet}", columns = None, float_format = "{:.3f}".format, index = True)
             
     def __latexTableWrapper(self, table, fileName, columns, float_format = "{:.2e}".format, index = False):
@@ -703,11 +742,12 @@ class ManuscriptFigures(EmulatorMetaData):
                 
 
 def main():
-
-    figObject = ManuscriptFigures({"simulationData" : "/home/aholaj/mounttauskansiot/puhtiwork/EmulatorManuscriptData",
-                                  "figures" : "/home/aholaj/Nextcloud/000_WORK/000_ARTIKKELIT/02_LES-Emulator/001_Manuscript_LES_emulator/figures",
-                                  "tables" : "/home/aholaj/Nextcloud/000_WORK/000_ARTIKKELIT/02_LES-Emulator/001_Manuscript_LES_emulator/tables"},
-                                  "/home/aholaj/mounttauskansiot/puhtiwork/EmulatorManuscriptData/phase02.yaml")
+    try:
+        locationsFile = sys.argv[1]
+    except IndexError:
+        locationsFile = "/home/aholaj/mounttauskansiot/puhtiwork/EmulatorManuscriptData/locations_local_puhti_mounted.yaml"
+        
+    figObject = ManuscriptFigures(locationsFile)
 
     if True:
         figObject.initReadFeatureImportanceData()
