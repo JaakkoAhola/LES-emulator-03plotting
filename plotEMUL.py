@@ -437,10 +437,10 @@ class ManuscriptFigures(EmulatorMetaData):
     def figureSimulatedUpdraft_vs_CloudRadiativeWarming(self):
         self.__figureUpdraft_vs_CloudRadiativeWarming(self.responseVariable, {"fig" : "figureSimulatedUpdraft_vs_CloudRadiativeWarming", "legend" : "Simulated"}, Colorful.getDistinctColorList("orange"))
     def figureLinearFitUpdraft_vs_CloudRadiativeWarming(self):
-        self.__figureUpdraft_vs_CloudRadiativeWarming(self.linearFitVariable, {"fig" : "figureLinearFitUpdraft_vs_CloudRadiativeWarming", "legend" : "Linear Fit"}, Colorful.getDistinctColorList("red"))
+        self.__figureUpdraft_vs_CloudRadiativeWarming(self.linearFitVariable, {"fig" : "figureLinearFitUpdraft_vs_CloudRadiativeWarming", "legend" : self.predictorClearNames["linearFit"]}, Colorful.getDistinctColorList("red"))
         
     def figureCorrectedLinearUpdraft_vs_CloudRadiativeWarming(self):
-        self.__figureUpdraft_vs_CloudRadiativeWarming(self.correctedLinearFitVariable, {"fig" : "figureCorrectedLinearUpdraft_vs_CloudRadiativeWarming", "legend" :"Corr. Lin. Fit"}, Colorful.getDistinctColorList("green"))
+        self.__figureUpdraft_vs_CloudRadiativeWarming(self.correctedLinearFitVariable, {"fig" : "figureCorrectedLinearUpdraft_vs_CloudRadiativeWarming", "legend" :self.predictorClearNames["correctedLinearFit"]}, Colorful.getDistinctColorList("green"))
         
     def __figureUpdraft_vs_CloudRadiativeWarming(self, updraftVariableName, names : dict, dataColor):
 
@@ -707,15 +707,15 @@ class ManuscriptFigures(EmulatorMetaData):
                     line = line.replace("midrule", "middlehline")
                     line = line.replace("bottomrule", "bottomhline")
                     
-                    line = line.replace("\\$\\textbackslashmathbf\\{\\{cos\\_\\{\\textbackslashmu\\}\\}\\{\\textbackslash\\}\\}\\$", "$cos_{\\mu}$")
-                    line = line.replace("\\$\\textbackslashmathbf\\{\\{N\\_\\{as\\}\\}\\{\\textbackslash\\}\\}\\$", "$N_{as}$")
-                    line = line.replace("\\$\\textbackslashmathbf\\{\\{N\\_\\{ks\\}\\}\\{\\textbackslash\\}\\}\\$", "$N_{ks}$")
-                    line = line.replace("\\$\\textbackslashmathbf\\{\\{N\\_\\{cs\\}\\}\\{\\textbackslash\\}\\}\\$", "$N_{cs}$")
-                    line = line.replace("\\$\\textbackslashmathbf\\{\\{w\\_\\{lin.fit\\}\\}\\{\\textbackslash\\}\\}\\$", "$w_{lin.fit}$")
-                    line = line.replace("\\$\\textbackslashmathbf\\{\\{\\{\\textbackslashtheta\\}\\_\\{L\\}\\}\\{\\textbackslash\\}\\}\\$", "${\\theta}_{L}$")
-                    line = line.replace("\\$\\textbackslashmathbf\\{\\{\\textbackslashDelta\\{\\textbackslashtheta\\}\\_\\{L\\}\\}\\{\\textbackslash\\}\\}\\$", "$\\Delta  {\\theta}_{L}$")
-                    line = line.replace("\\$\\textbackslashmathbf\\{\\{\\textbackslashDeltaq\\_\\{L\\}\\}\\{\\textbackslash\\}\\}\\$", "$\\Delta q_{L}$")
-                    line = line.replace("\\$\\textbackslashmathbf\\{\\{r\\_\\{eff\\}\\}\\{\\textbackslash\\}\\}\\$", "$r_{eff}$")
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{cos\\_\\{\\textbackslashmu\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("cos_mu"))
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{N\\_\\{as\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("as")) 
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{N\\_\\{ks\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("ks"))
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{N\\_\\{cs\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("cs"))
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{w\\_\\{lin.fit\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("w2pos_linearFit"))
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{\\{\\textbackslashtheta\\}\\_\\{L\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("tpot_pbl"))
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{\\textbackslashDelta\\{\\textbackslashtheta\\}\\_\\{L\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("tpot_inv"))
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{\\textbackslashDeltaq\\_\\{L\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("q_inv"))
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{r\\_\\{eff\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("rdry_AS_eff"))
                     
                     
                     line = line.replace("mathLabel", "Variable")
@@ -726,9 +726,9 @@ class ManuscriptFigures(EmulatorMetaData):
                     line = line.replace("rSquared", "$R^2$")
                     line = line.replace("r\\_value", "R")
                     
-                    line = line.replace("emulator", "Emulator")
-                    line = line.replace("linearFit", "Linear fit")
-                    line = line.replace("correctedLinearFit", "Corr. Lin. fit")
+                    line = line.replace("emulator", self.predictorClearNames["emulator"])
+                    line = line.replace("linearFit", self.predictorClearNames["linearFit"])
+                    line = line.replace("correctedLinearFit", self.predictorClearNames["correctedLinearFit"])
                     
                     line = line.replace("\\_Mean", " mean")
                     line = line.replace("\\_Std", " std")
