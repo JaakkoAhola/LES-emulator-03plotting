@@ -59,12 +59,14 @@ class ManuscriptFigures(EmulatorMetaData):
             "(c) SALSA Night",
             "(d) SALSA Day"]
         
-        self.traininSetSensibleNames = ["SB\ Night",
+        self.trainingSetSensibleNames = ["SB\ Night",
             "SB\ Day",
             "SALSA\ Night",
             "SALSA\ Day"]
         
-        self.allSetColors = dict(zip([PlotTweak.getLatexLabel(name) for name in ["Filtered\ ECHAM"] + self.traininSetSensibleNames], [Colorful.getDistinctColorList("grey")] + list(self.trainingSetColors.values()) ))
+        self.trainingSetSensibleDict = dict(zip(self.trainingSetList, self.trainingSetSensibleNames))
+        
+        self.allSetColors = dict(zip([PlotTweak.getLatexLabel(name) for name in ["Filtered\ ECHAM"] + self.trainingSetSensibleNames], [Colorful.getDistinctColorList("grey")] + list(self.trainingSetColors.values()) ))
 
         self.annotationCollection = dict(zip(self.trainingSetList, self.annotationValues))
 
@@ -77,13 +79,14 @@ class ManuscriptFigures(EmulatorMetaData):
         self.observationParameters["intercept"] = 22.30/100.
         self.observationParameters["error"] = 13./100.
 
+        self.predictorShortNames = ["linearFit", "correctedLinearFit", "emulator"]
         
-        self.predictorColors = {"linearFit" : Colorful.getDistinctColorList("red"),
-                           "correctedLinearFit" : Colorful.getDistinctColorList("green"),
-                           "emulator" : Colorful.getDistinctColorList("blue")}
-        self.predictorStatsColumns = list(self.predictorColors)        
+        self.predictorShortNameDict = dict(zip(self.predictionVariableList, self.predictorShortNames))
         
-        self.predictorClearNames = dict(zip(self.predictorStatsColumns, ["Lin. Fit", "Lin. Fit + Random Forest", "Gaussian Process"]))
+        self.predictorColors = dict(zip(self.predictorShortNames, Colorful.getDistinctColorList(["red", "green", "blue"])))
+            
+        
+        self.predictorClearNames = dict(zip(self.predictorShortNames, ["Lin. Fit", "Lin. Fit + Random Forest", "Gaussian Process"]))
 
         self._initReadCompleteData()
 
@@ -322,7 +325,7 @@ class ManuscriptFigures(EmulatorMetaData):
                 PlotTweak.hideYTickLabels(ax)
             else:
                 ax.text(PlotTweak.getXPosition(ax, -0.24), PlotTweak.getYPosition(ax, 0.),
-                            PlotTweak.getLatexLabel(self.traininSetSensibleNames[ind//ncols]), size=8 , rotation =90)
+                            PlotTweak.getLatexLabel(self.trainingSetSensibleNames[ind//ncols]), size=8 , rotation =90)
             if ind == 1:
                 ax.text(PlotTweak.getXPosition(ax, 0.2), PlotTweak.getYPosition(ax, 1.05), self.predictorClearNames["emulator"], size=8)
             if ind == 0:
@@ -355,7 +358,7 @@ class ManuscriptFigures(EmulatorMetaData):
         for row,trainingSet in enumerate(self.trainingSetList):
             for col, predictor in enumerate(self.predictionVariableList):
                 ax = fig.getAxesGridPoint( {"row": row, "col": col})
-                shortname = self.predictorStatsColumns[col]
+                shortname = self.predictorShortNames[col]
                 dataframe = self.completeDataFrame[trainingSet]
                 if self.completeDataFrame[trainingSet] is None or self.statsCollection[trainingSet] is None:
                     continue
@@ -364,7 +367,7 @@ class ManuscriptFigures(EmulatorMetaData):
     
                 simulated = dataframe[self.responseVariable]
     
-                statistics = self.statsCollection[trainingSet].loc[ self.predictorStatsColumns[col] ]
+                statistics = self.statsCollection[trainingSet].loc[ self.predictorShortNames[col] ]
     
                 slope = statistics["slope"]
                 intercept = statistics["intercept"]
@@ -415,7 +418,7 @@ class ManuscriptFigures(EmulatorMetaData):
                 PlotTweak.hideYTickLabels(ax)
             else:
                 ax.text(PlotTweak.getXPosition(ax, -0.56), PlotTweak.getYPosition(ax, 0.3),
-                        PlotTweak.getLatexLabel(self.traininSetSensibleNames[ind//3]), size=8 , rotation =90)
+                        PlotTweak.getLatexLabel(self.trainingSetSensibleNames[ind//3]), size=8 , rotation =90)
 
             if ind not in list(range(9,12)):
                 PlotTweak.hideXTickLabels(ax)
@@ -662,9 +665,12 @@ class ManuscriptFigures(EmulatorMetaData):
             for predictor in self.featureImportanceDataCollection[trainingSet]:
                 
                 dataframe = self.featureImportanceDataCollection[trainingSet][predictor]
+                clearName = self.predictorClearNames[ self.predictorShortNameDict[predictor] ]
+                clearName = clearName.replace(" ", "#")
+                dataframe.rename(columns = {"mathLabel":clearName}, inplace = True)
                 self.__latexTableWrapper(dataframe,
                                          f"table_featureImportanceStats_{trainingSet}_{predictor.split('_')[-1]}",
-                                         ["mathLabel", "Mean", "Std", "relativeImportance"],
+                                         [clearName, "Mean", "Std", "relativeImportance"],
                                          float_format="{:.3f}".format)
     
     def tables_featureImportanceOrder(self):
@@ -676,20 +682,22 @@ class ManuscriptFigures(EmulatorMetaData):
         for trainingSet in self.trainingSetList:
             if self.statsCollection[trainingSet] is None:
                 continue
-            statistics = self.statsCollection[trainingSet].loc[ self.predictorStatsColumns ]
+            statistics = self.statsCollection[trainingSet].loc[ self.predictorShortNames ]
             
-            statistics["Predictor"] = self.predictorClearNames
+            firstColumnName = self.trainingSetSensibleDict[trainingSet].replace("\ ", "#")
+            statistics[firstColumnName] = self.predictorClearNames
             
             self.__latexTableWrapper(statistics,
                                      f"tables_predictorsVsSimulated_{trainingSet}",
-                                     ["Predictor", "rSquared","r_value", "rmse"],
+                                     [firstColumnName, "rSquared","r_value", "rmse"],
                                      float_format="{:.3f}".format)
             
     def tables_bootstraps(self):
         for trainingSet in self.trainingSetList:
             if self.bootstrapCollection[trainingSet] is None:
                 continue
-            self.__latexTableWrapper( self.bootstrapCollection[trainingSet], f"Bootstrap_{trainingSet}", columns = None, float_format = "{:.3f}".format, index = True)
+            self.bootstrapCollection[trainingSet].insert(loc = 0, column = self.trainingSetSensibleDict[trainingSet].replace("\ ", "#"), value = self.bootstrapCollection[trainingSet].index.values)
+            self.__latexTableWrapper( self.bootstrapCollection[trainingSet], f"Bootstrap_{trainingSet}", columns = None, float_format = "{:.3f}".format, index = False)
             
     def __latexTableWrapper(self, table, fileName, columns, float_format = "{:.2e}".format, index = False):
         table.to_latex(self.tableFolder / (fileName + ".tex"), columns = columns, index = index, float_format=float_format)
@@ -708,9 +716,9 @@ class ManuscriptFigures(EmulatorMetaData):
                     line = line.replace("bottomrule", "bottomhline")
                     
                     line = line.replace("\\$\\textbackslashmathbf\\{\\{cos\\_\\{\\textbackslashmu\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("cos_mu"))
-                    line = line.replace("\\$\\textbackslashmathbf\\{\\{N\\_\\{as\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("as")) 
-                    line = line.replace("\\$\\textbackslashmathbf\\{\\{N\\_\\{ks\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("ks"))
-                    line = line.replace("\\$\\textbackslashmathbf\\{\\{N\\_\\{cs\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("cs"))
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{N\\_\\{" +  PlotTweak.getMathLabelSubscript("as") +"\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("as")) 
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{N\\_\\{" + PlotTweak.getMathLabelSubscript("ks") +"\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("ks"))
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{N\\_\\{" + PlotTweak.getMathLabelSubscript("cs") +"\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("cs"))
                     line = line.replace("\\$\\textbackslashmathbf\\{\\{w\\_\\{lin.fit\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("w2pos_linearFit"))
                     line = line.replace("\\$\\textbackslashmathbf\\{\\{\\{\\textbackslashtheta\\}\\_\\{L\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("tpot_pbl"))
                     line = line.replace("\\$\\textbackslashmathbf\\{\\{\\textbackslashDelta\\{\\textbackslashtheta\\}\\_\\{L\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("tpot_inv"))
@@ -732,7 +740,7 @@ class ManuscriptFigures(EmulatorMetaData):
                     
                     line = line.replace("\\_Mean", " mean")
                     line = line.replace("\\_Std", " std")
-                    
+                    line = line.replace("\\#", " ")
                     
                     linesToBeWritten.append(line)
             texFile.unlink()
