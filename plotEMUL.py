@@ -139,7 +139,7 @@ class ManuscriptFigures(EmulatorMetaData):
             for ind in dataset.index:
                 series = dataset.loc[ind]
                 mean = series.loc[[kk for kk in series.index if kk[-4:] == "Mean"]]
-                std = series.loc[[kk for kk in series.index if kk[-4:] == "Mean"]]
+                std = series.loc[[kk for kk in series.index if kk[-3:] == "Std"]]
                 ines = [kk[:-22] for kk in series.index if kk[-4:] == "Mean"]
                 
                 self.allLabels += ines
