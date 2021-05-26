@@ -724,6 +724,7 @@ class ManuscriptFigures(EmulatorMetaData):
                     line = line.replace("\\$\\textbackslashmathbf\\{\\{\\textbackslashDelta\\{\\textbackslashtheta\\}\\_\\{L\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("tpot_inv"))
                     line = line.replace("\\$\\textbackslashmathbf\\{\\{\\textbackslashDeltaq\\_\\{L\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("q_inv"))
                     line = line.replace("\\$\\textbackslashmathbf\\{\\{r\\_\\{eff\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("rdry_AS_eff"))
+                    line = line.replace("\\$\\textbackslashmathbf\\{\\{H\\_\\{PBL\\}\\}\\{\\textbackslash\\}\\}\\$", PlotTweak.getMathLabelTableFormat("pblh"))
                     
                     
                     line = line.replace("mathLabel", "Variable")
