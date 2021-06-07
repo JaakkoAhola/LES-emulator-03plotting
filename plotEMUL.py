@@ -10,6 +10,7 @@ Plot figures for Updraft emulator manuscript
 """
 print(__doc__)
 import matplotlib
+import matplotlib.ticker as mticker
 import math
 import numpy
 import os
@@ -18,6 +19,7 @@ import pathlib
 import sys
 from scipy import stats
 import time
+from datetime import datetime
 
 sys.path.append(os.environ["LESMAINSCRIPTS"])
 from Colorful import Colorful
@@ -86,7 +88,7 @@ class ManuscriptFigures(EmulatorMetaData):
         self.predictorColors = dict(zip(self.predictorShortNames, Colorful.getDistinctColorList(["red", "green", "blue"])))
             
         
-        self.predictorClearNames = dict(zip(self.predictorShortNames, ["Lin. Fit", "Lin. Fit + Random Forest", "Gaussian Process"]))
+        self.predictorClearNames = dict(zip(self.predictorShortNames, ["LF", "LFRF", "GPE"]))
 
         self._initReadCompleteData()
 
@@ -423,11 +425,11 @@ class ManuscriptFigures(EmulatorMetaData):
             if ind not in list(range(9,12)):
                 PlotTweak.hideXTickLabels(ax)
                 
-            if ind == 0:
+            if ind == 1:
                 collectionOfLabelsColors = dict(zip(list(self.predictorClearNames.values()), list(self.predictorColors.values())))
                 legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
 
-                artist = ax.legend( handles=legendLabelColors, loc=(-0.52, 1.05), frameon = True, framealpha = 1.0, ncol = 3 )
+                artist = ax.legend( handles=legendLabelColors, loc=(-0.4, 1.05), frameon = True, framealpha = 1.0, ncol = 3 )
 
                 ax.add_artist(artist)
                 
@@ -437,15 +439,15 @@ class ManuscriptFigures(EmulatorMetaData):
             if ind == 10:
                 ax.text(-0.1,-0.27,PlotTweak.getUnitLabel("Simulated\ w_{pos}", "m\ s^{-1}") , size=8)
 
-    def figureSimulatedUpdraft_vs_CloudRadiativeWarming(self):
-        self.__figureUpdraft_vs_CloudRadiativeWarming(self.responseVariable, {"fig" : "figureSimulatedUpdraft_vs_CloudRadiativeWarming", "legend" : "Simulated"}, Colorful.getDistinctColorList("orange"))
-    def figureLinearFitUpdraft_vs_CloudRadiativeWarming(self):
-        self.__figureUpdraft_vs_CloudRadiativeWarming(self.linearFitVariable, {"fig" : "figureLinearFitUpdraft_vs_CloudRadiativeWarming", "legend" : self.predictorClearNames["linearFit"]}, Colorful.getDistinctColorList("red"))
+    def figureSimulatedUpdraft_vs_CloudRadiativeCooling(self):
+        self.__figureUpdraft_vs_CloudRadiativeCooling(self.responseVariable, {"fig" : "figureSimulatedUpdraft_vs_CloudRadiativeCooling", "legend" : "Simulated"}, Colorful.getDistinctColorList("orange"))
+    def figureLinearFitUpdraft_vs_CloudRadiativeCooling(self):
+        self.__figureUpdraft_vs_CloudRadiativeCooling(self.linearFitVariable, {"fig" : "figureLinearFitUpdraft_vs_CloudRadiativeCooling", "legend" : self.predictorClearNames["linearFit"]}, Colorful.getDistinctColorList("red"))
         
-    def figureCorrectedLinearUpdraft_vs_CloudRadiativeWarming(self):
-        self.__figureUpdraft_vs_CloudRadiativeWarming(self.correctedLinearFitVariable, {"fig" : "figureCorrectedLinearUpdraft_vs_CloudRadiativeWarming", "legend" :self.predictorClearNames["correctedLinearFit"]}, Colorful.getDistinctColorList("green"))
+    def figureCorrectedLinearUpdraft_vs_CloudRadiativeCooling(self):
+        self.__figureUpdraft_vs_CloudRadiativeCooling(self.correctedLinearFitVariable, {"fig" : "figureCorrectedLinearUpdraft_vs_CloudRadiativeCooling", "legend" :self.predictorClearNames["correctedLinearFit"]}, Colorful.getDistinctColorList("green"))
         
-    def __figureUpdraft_vs_CloudRadiativeWarming(self, updraftVariableName, names : dict, dataColor):
+    def __figureUpdraft_vs_CloudRadiativeCooling(self, updraftVariableName, names : dict, dataColor):
 
 
         self.figures[names["fig"]] = Figure(self.figureFolder,names["fig"], figsize = [self.figureWidth, 4],
@@ -478,17 +480,17 @@ class ManuscriptFigures(EmulatorMetaData):
             dataFrameInside = dataframe[ ~condition["notMatchObservation"]]
             percentageInside = len(dataFrameInside) / len(dataframe) *100.
 
-            radiativeWarming  = dataframe["drflx"].values
+            radiativeCooling  = dataframe["drflx"].values
             updraft =  dataframe[updraftVariableName].values
 
 
             poly1d_Observation = numpy.poly1d(numpy.asarray([self.observationParameters["slope"],self.observationParameters["intercept"] ])) #?0.44 ×CTRC+
-            ax.plot(radiativeWarming, poly1d_Observation(radiativeWarming), color = color_obs)
-            ax.fill_between(sorted(radiativeWarming),
-                            poly1d_Observation(sorted(radiativeWarming)) - self.observationParameters["error"]*numpy.ones(numpy.shape(radiativeWarming)), poly1d_Observation(sorted(radiativeWarming)) + self.observationParameters["error"]*numpy.ones(numpy.shape(radiativeWarming)),
+            ax.plot(radiativeCooling, poly1d_Observation(radiativeCooling), color = color_obs)
+            ax.fill_between(sorted(radiativeCooling),
+                            poly1d_Observation(sorted(radiativeCooling)) - self.observationParameters["error"]*numpy.ones(numpy.shape(radiativeCooling)), poly1d_Observation(sorted(radiativeCooling)) + self.observationParameters["error"]*numpy.ones(numpy.shape(radiativeCooling)),
                             alpha=0.2)
 
-            slope, intercept, r_value, p_value, std_err = stats.linregress(radiativeWarming, updraft)
+            slope, intercept, r_value, p_value, std_err = stats.linregress(radiativeCooling, updraft)
             coef = [slope, intercept]
             rSquared = numpy.power(r_value, 2)
 
@@ -498,11 +500,11 @@ class ManuscriptFigures(EmulatorMetaData):
             poly1d_fn = numpy.poly1d(coef)
 
             linearFit = []
-            for radWarmingValue in list(self.completeDataFrame[trainingSet]["drflx"]):
-                linearFit.append(poly1d_fn(radWarmingValue))
+            for radCoolingValue in list(self.completeDataFrame[trainingSet]["drflx"]):
+                linearFit.append(poly1d_fn(radCoolingValue))
 
             self.completeDataFrame[trainingSet][self.linearFitVariable] = linearFit
-            ax.plot(radiativeWarming, poly1d_fn(radiativeWarming), color = fitColor)
+            ax.plot(radiativeCooling, poly1d_fn(radiativeCooling), color = fitColor)
 
             ax.set_xlim([xstart, xend])
             ax.set_ylim([ystart, yend])
@@ -523,7 +525,7 @@ class ManuscriptFigures(EmulatorMetaData):
 
 
             if ind == 0:
-                collectionOfLabelsColors = {names["legend"] : dataColor, "Fit" : "k", "Observations" : color_obs}
+                collectionOfLabelsColors = {names["legend"] : dataColor, "Fit" : "k", "Zheng et al. 2016" : color_obs}
                 legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
 
                 artist = ax.legend( handles=legendLabelColors, loc=(0.17, 1.02), frameon = True, framealpha = 1.0, ncol = 3 )
@@ -534,8 +536,7 @@ class ManuscriptFigures(EmulatorMetaData):
                 f"""{PlotTweak.getLatexLabel('y=a + b * x')}
 {PlotTweak.getLatexLabel(f'a={intercept:.4f}')}
 {PlotTweak.getLatexLabel(f'b={slope:.6f}')}
-{PlotTweak.getLatexLabel(f'R^2={rSquared:.2f}')}
-{PlotTweak.getLatexLabel('p_{in}=' + f'{percentageInside:.1f}')}%""", fontsize = 6)
+{PlotTweak.getLatexLabel(f'R^2={rSquared:.2f}')}""", fontsize = 6)
 
             ax.set_yticks(yticks)
             ax.set_yticklabels(tickLabels)
@@ -553,7 +554,7 @@ class ManuscriptFigures(EmulatorMetaData):
                 ax.text(PlotTweak.getXPosition(ax, -0.27), PlotTweak.getYPosition(ax, -0.5),
                         PlotTweak.getUnitLabel(names["legend"] + "\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
             if ind == 2:
-                ax.text(0.3,-0.25, PlotTweak.getUnitLabel("Cloud\ rad.\ warming", "W\ m^{-2}"), size=8)
+                ax.text(-30,-0.25, PlotTweak.getUnitLabel("Cloud\ radiative\ cooling", "W\ m^{-2}"), size=8)
                 
 
 
@@ -564,7 +565,7 @@ class ManuscriptFigures(EmulatorMetaData):
         
         self.figures["figureDesignVariables"] = Figure(self.figureFolder,"figureDesignVariables",
                                                    figsize = [self.figureWidth, 7],  ncols = ncols, nrows = nrows,
-                                                   bottom = 0.04, hspace = 0.17, wspace=0.07, top=0.98, left=0.02, right = 0.98)
+                                                   bottom = 0.04, hspace = 0.17, wspace=0.07, top=0.98, left=0.05, right = 0.99)
         fig = self.figures["figureDesignVariables"]
         rightUp = [0.57, 0.70]
         leftUp = [0.25, 0.73]
@@ -574,7 +575,7 @@ class ManuscriptFigures(EmulatorMetaData):
         default = [0.5,0.5]
         specsPositions = [ [0.3, 0.05], [0.2, 0.05], [0.3,0.5], 
                         [0.3,0.5], [0.3, 0.4], [0.3,0.5],
-                        [0.05, 0.50], [0.05, 0.50], [0.05, 0.50],
+                        [0.05, 0.05], [0.05, 0.05], [0.05, 0.05],
                         [0.3, 0.05], middleDown
                         ]
         meanStr = "\mu"
@@ -637,16 +638,44 @@ class ManuscriptFigures(EmulatorMetaData):
                     if not hasattr(self, "filteredSourceData") and isAnnotated:
                         ax.annotate( variableSpecs, xy=specsPositions[ind], size=8, bbox = dict(pad = 0.6, fc="w", ec="w", alpha=0.9), xycoords = "axes fraction")
                         isAnnotated = False
-                    
             
-            annotation = f"({Data.getNthLetter(ind)}) {loga}{PlotTweak.getMathLabel(variable)}"
+            variableAnnotationYposition = 0.9
+            
+            if variable == "cos_mu":
+                annotationOfVariable = PlotTweak.getMathLabel(variable)
+            elif variable in ["as", "ks", "cs"]:
+                
+                annotationOfVariable = r"$\mathbf{" rf"{PlotTweak.getMathLabelFromDict(variable)}" r"}$" "\n" fr"(${PlotTweak.getVariableUnit(variable)}$)"
+                variableAnnotationYposition = 0.80
+            else:
+                annotationOfVariable = PlotTweak.getUnitLabel(PlotTweak.getMathLabelFromDict(variable), PlotTweak.getVariableUnit(variable))
+                
+            annotation = f"({Data.getNthLetter(ind)}) {loga}{annotationOfVariable}"
             PlotTweak.setAnnotation(ax, annotation,
                                     xPosition =  0.05,
-                                    yPosition = 0.9,
+                                    yPosition = variableAnnotationYposition,
                                     xycoords = "axes fraction") 
             ax.set_ylabel("")
             ax.set_xlim([minimi, maximi])
-            PlotTweak.hideYTickLabels(ax)
+            ax.set_ylim([0,ax.get_ylim()[1]])
+            
+            
+            # fixing yticks with matplotlib.ticker "FixedLocator"
+            label_format = '{:,.0f}'
+            ticks_loc = ax.get_yticks().tolist()
+            ax.yaxis.set_major_locator(mticker.FixedLocator(ticks_loc))
+            yticklabels =[label_format.format(x) for x in ticks_loc]
+            yticklabels[0] = "0"
+            ax.set_yticklabels(yticklabels)
+            
+            
+            if ind in [0,3,6,9,12]:
+                matplotlib.pyplot.setp(ax.get_yticklabels()[0], visible=True)
+                matplotlib.pyplot.setp(ax.get_yticklabels()[1:], visible=False)
+            else:
+                PlotTweak.hideYTickLabels(ax)
+            
+            
         
         ax = fig.getAxes(11)
         ax.axis("off")
@@ -764,7 +793,7 @@ def main():
         figObject.tables_featureImportanceOrder()
         figObject.table_featureImportanceStats()
     if True:
-        figObject.figureSimulatedUpdraft_vs_CloudRadiativeWarming()
+        figObject.figureSimulatedUpdraft_vs_CloudRadiativeCooling()
         
         
     if True:
@@ -784,6 +813,9 @@ def main():
 
 if __name__ == "__main__":
     start = time.time()
+    now = datetime.now().strftime('%d.%m.%Y %H.%M')
+    print(f"Script started {now}.")
     main()
     end = time.time()
-    print(f"Script completed in {Data.timeDuration(end - start)}")
+    now = datetime.now().strftime('%d.%m.%Y %H.%M')
+    print(f"Script completed {now} in {Data.timeDuration(end - start)}")
