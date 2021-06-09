@@ -178,40 +178,68 @@ class ManuscriptFigures(EmulatorMetaData):
         self.labelRelative = dict(zip(self.uniqueLabels, [1]*len(self.uniqueLabels)))
         
         self.zeros = dict(zip(self.uniqueLabels, [0]*len(self.uniqueLabels)))
+
+        self.meanArray = {}
+        for key in self.uniqueLabels:
+            self.meanArray[key] = []
+        
+        self.methodMeanArray = {}
+        for predictor in self.featureImportanceDataCollection["LVL3Night"]:
+            self.methodMeanArray[predictor] = {}
+            for key in self.uniqueLabels:
+                self.methodMeanArray[predictor][key] = []
+        
         for key in self.uniqueLabels:
             for row,trainingSet in enumerate(list(self.featureImportanceDataCollection)):
                 if self.featureImportanceDataCollection[trainingSet] is None:
-                        continue
+                    continue
                 for col, predictor in enumerate(list(self.featureImportanceDataCollection[trainingSet])):
                     
-                    dataframe = self.featureImportanceDataCollection[trainingSet][predictor]
                     
+                    dataframe = self.featureImportanceDataCollection[trainingSet][predictor]
                     if key in dataframe.index:
                         relative = dataframe.loc[key]["relativeImportance"]
+                        self.meanArray[key].append( dataframe.loc[key]["relativeImportance"] )
+                        self.methodMeanArray[predictor][key].append(dataframe.loc[key]["relativeImportance"])
                         if relative < Data.getEpsilon():
                             relative = 1
                             self.zeros[key] += 1
                         self.labelRelative[key] *= relative
         
     def _initReadFeatureImportanceData_phase04(self):
+        
+        for key in self.meanArray:
+            self.meanArray[key] = numpy.asarray(self.meanArray[key]).mean()
+        for predictor in self.methodMeanArray:
+            for key in self.methodMeanArray[predictor]:
+                self.methodMeanArray[predictor][key] = numpy.asarray(self.methodMeanArray[predictor][key]).mean()
+        
         relativeCombined = pandas.DataFrame.from_dict(self.labelRelative, orient="index", columns = ["relativeCombined"])
         zeros = pandas.DataFrame.from_dict(self.zeros, orient="index", columns = ["zeros"])
-        labelOrder = pandas.concat((relativeCombined, zeros), axis = 1)
         
-        self.labelRelative = []
-        self.labelCategorised = []
-        for zeroAmount in set(labelOrder["zeros"].values):
-            subdf = labelOrder[labelOrder["zeros"] == zeroAmount].sort_values(by="relativeCombined", ascending = False)
-            self.labelCategorised.append(subdf)
-            self.labelRelative += list(subdf.index.values)
+        allMean = pandas.DataFrame.from_dict(self.meanArray, orient="index", columns = ["relativeMean"])
         
+        self.methodMeans = {}        
+        for predictor in self.methodMeanArray:
+            if predictor.split("_")[-1] == "Emulated":
+                self.methodMeans[self.predictorClearNames["emulator"]] = self.methodMeanArray[predictor]
+            elif predictor.split("_")[-1] == "CorrectedLinearFit":
+                self.methodMeans[self.predictorClearNames["correctedLinearFit"]] = self.methodMeanArray[predictor]
+                
+                
+        lfrfMean = pandas.DataFrame.from_dict(self.methodMeans[self.predictorClearNames["correctedLinearFit"]], orient="index", columns = ["LFRF relative mean"])
+        gpeMean = pandas.DataFrame.from_dict(self.methodMeans[self.predictorClearNames["emulator"]], orient="index", columns = ["GPE relative mean"])
         
-        self.labelCategorised = pandas.concat(self.labelCategorised)
+        self.labelCategorised = pandas.concat((allMean, relativeCombined, zeros, lfrfMean, gpeMean), axis = 1)
+        
+
         
         self.labelCategorised["mathLabel"] = self.labelCategorised.apply(lambda row: PlotTweak.getMathLabel(row.name), axis = 1)
+        self.labelCategorised = self.labelCategorised.sort_values(by="relativeMean", ascending =False)
+        
         
     def _initReadFeatureImportanceData_phase05(self):
-        self.uniqueLabels = self.labelRelative
+        self.uniqueLabels = self.labelCategorised.index.values
         
         self._getColorsForLabels()
         
@@ -224,7 +252,7 @@ class ManuscriptFigures(EmulatorMetaData):
         
 
     def initReadFilteredSourceData(self):
-        localPath = pathlib.Path("/home/aholaj/ECLAIR")
+        localPath = pathlib.Path("/home/aholaj/Data/ECLAIR")
         if localPath.is_dir():
             try:
                 self.filteredSourceData = pandas.read_csv( localPath / "eclair_dataset_2001_designvariables.csv", index_col = 0 )
@@ -705,8 +733,9 @@ class ManuscriptFigures(EmulatorMetaData):
     def tables_featureImportanceOrder(self):
         self.__latexTableWrapper(self.labelCategorised,
                                  "tables_featureImportanceOrder",
-                                 ["mathLabel", "relativeCombined", "zeros"])
-                
+                                 ["mathLabel", "relativeMean", "LFRF relative mean", "GPE relative mean" , "zeros"],
+                                 float_format="{:.3f}".format, column_format = "| m{1.2cm}  |m{2cm}  | m{1cm} | m{2cm} |m{2cm} |")
+
     def tables_predictorsVsSimulated(self):
         for trainingSet in self.trainingSetList:
             if self.statsCollection[trainingSet] is None:
@@ -728,8 +757,8 @@ class ManuscriptFigures(EmulatorMetaData):
             self.bootstrapCollection[trainingSet].insert(loc = 0, column = self.trainingSetSensibleDict[trainingSet].replace("\ ", "#"), value = self.bootstrapCollection[trainingSet].index.values)
             self.__latexTableWrapper( self.bootstrapCollection[trainingSet], f"Bootstrap_{trainingSet}", columns = None, float_format = "{:.3f}".format, index = False)
             
-    def __latexTableWrapper(self, table, fileName, columns, float_format = "{:.2e}".format, index = False):
-        table.to_latex(self.tableFolder / (fileName + ".tex"), columns = columns, index = index, float_format=float_format)
+    def __latexTableWrapper(self, table, fileName, columns, float_format = "{:.2e}".format, index = False, column_format = None):
+        table.to_latex(self.tableFolder / (fileName + ".tex"), columns = columns, index = index, float_format=float_format, column_format = column_format)
     
     def finaliseLatexTables(self):
         for texFile in self.tableFolder.glob("**/*.tex"):
@@ -758,8 +787,11 @@ class ManuscriptFigures(EmulatorMetaData):
                     
                     line = line.replace("mathLabel", "Variable")
                     line = line.replace("relativeCombined", "Product of relative permutation feature importances")
+                    line = line.replace("relativeMean", "Mean of relative permutation feature importances")
                     line = line.replace("zeros", "Number of times relative importance equal to zero")
                     line = line.replace("relativeImportance", "Relative permutation feature importance")
+                    line = line.replace("LFRFrelativemean", "LFRF relative mean")
+                    line = line.replace("GPErelativemean", "GPE relative mean")
                     
                     line = line.replace("rSquared", "$R^2$")
                     line = line.replace("r\\_value", "R")
