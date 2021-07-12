@@ -288,7 +288,7 @@ class ManuscriptFigures(EmulatorMetaData):
             self.anomalyLimits = None
 
     def _getColorsForLabels(self):
-        self.uniqueLabels = list(numpy.array(self.uniqueLabels).reshape(-1,self.legendCols).T.reshape(-1,1).ravel())
+        self.uniqueLabels = Data.reorganiseArrayByColumnNumber(self.uniqueLabels, self.legendCols)
         
         self.uniqueColors = [ PlotTweak.getLabelColor( label ) for label in self.uniqueLabels ]
         
@@ -304,7 +304,7 @@ class ManuscriptFigures(EmulatorMetaData):
     def finalise(self):
 
         for fig in self.figures.values():
-            fig.save()
+            fig.save(file_extension = ".pdf")
 
 
     def figureBarFeatureImportanceData(self):
@@ -417,8 +417,8 @@ class ManuscriptFigures(EmulatorMetaData):
     
                 
                 PlotTweak.setAnnotation(ax, f"""{PlotTweak.getLatexLabel(f'R^2={rSquared:.2f}','')}
-{PlotTweak.getLatexLabel(f'RMSE={rmse:.3f}','')}""",
-                                        xPosition=0.28, yPosition=0.05, bbox_props = None)
+{PlotTweak.getLatexLabel(f'RMSE={rmse:.4f}','')}""",
+                                        xPosition=0.23, yPosition=0.05, bbox_props = None)
                 
                 PlotTweak.setXaxisLabel(ax,"")
                 PlotTweak.setYaxisLabel(ax,"")
@@ -582,7 +582,7 @@ class ManuscriptFigures(EmulatorMetaData):
                 ax.text(PlotTweak.getXPosition(ax, -0.27), PlotTweak.getYPosition(ax, -0.5),
                         PlotTweak.getUnitLabel(names["legend"] + "\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
             if ind == 2:
-                ax.text(-30,-0.25, PlotTweak.getUnitLabel("Cloud\ radiative\ cooling", "W\ m^{-2}"), size=8)
+                ax.text(-50,-0.25, PlotTweak.getUnitLabel("Cloud\ top\ radiative\ cooling", "W\ m^{-2}"), size=8)
                 
 
 
@@ -603,13 +603,16 @@ class ManuscriptFigures(EmulatorMetaData):
         default = [0.5,0.5]
         specsPositions = [ [0.3, 0.05], [0.2, 0.05], [0.3,0.5], 
                         [0.3,0.5], [0.3, 0.4], [0.3,0.5],
-                        [0.05, 0.05], [0.05, 0.05], [0.05, 0.05],
-                        [0.3, 0.05], middleDown
+                        [0.3,0.5], [0.3,0.5], [0.3,0.5],
+                        [0.2, 0.05], middleDown
                         ]
-        meanStr = "\mu"
-        stdStr = "\sigma"
-
-        logVariables = ["ks", "as", "cs", "rdry_AS_eff"]
+        
+        aeroNumberVariables = ["ks", "as", "cs"]
+        reff = "rdry_AS_eff"
+        
+        minisDesigns = [numpy.nan]*len(self.designVariablePool)
+        maxisDesigns = [numpy.nan]*len(self.designVariablePool)
+        
         for ind,variable in enumerate(self.designVariablePool):
             ax = fig.getAxes(ind)
             
@@ -623,22 +626,23 @@ class ManuscriptFigures(EmulatorMetaData):
             if hasattr(self, "filteredSourceData") and (self.filteredSourceData is not None):
                 sourceDataVariable = self.filteredSourceData[variableSourceName]
                 sourceDataVariable = Data.dropInfNanFromDataFrame(sourceDataVariable)
-                if variable in logVariables:
-                    sourceDataVariable = numpy.log10(sourceDataVariable)
+                if variable in aeroNumberVariables:
+                    sourceDataVariable = sourceDataVariable*1e-6
+                if variable == reff:
+                    sourceDataVariable = sourceDataVariable*1e9
                 sourceDataVariable = Data.dropInfNanFromDataFrame(sourceDataVariable)
                 
                 if variable == "cos_mu":
                     sourceDataVariable = sourceDataVariable[sourceDataVariable > Data.getEpsilon()]
                 sourceDataVariable.plot.density(ax = ax, color =Colorful.getDistinctColorList("grey"))
                 
-                variableSpecs = f"""{PlotTweak.getLatexLabel(f'min={sourceDataVariable.min():.2f}')}
-{PlotTweak.getLatexLabel(f'{meanStr}={sourceDataVariable.mean():.2f}')}
-{PlotTweak.getLatexLabel(f'{stdStr}={sourceDataVariable.std():.2f}')}
-{PlotTweak.getLatexLabel(f'max={sourceDataVariable.max():.2f}')}"""
                 
-                ax.annotate( variableSpecs, xy=specsPositions[ind], size=8, bbox = dict(pad = 0.6, fc="w", ec="w", alpha=0.9), xycoords = "axes fraction")
+                
+                
+                if variable in (aeroNumberVariables + [reff , "cdnc"]):
+                    print(f"{variable} ECHAM mean {sourceDataVariable.mean():.2f}, ECHAM median {sourceDataVariable.median():.2f}")
             
-            isAnnotated = True
+            
             for tt, trainingSet in enumerate(self.trainingSetList):
                 
                 if variable in self.completeDataFrame[trainingSet].keys():
@@ -647,43 +651,41 @@ class ManuscriptFigures(EmulatorMetaData):
                         continue
                     
                     trainingSetVariable = self.completeDataFrame[trainingSet][variable]
-                    if variable in logVariables:
-                        loga = PlotTweak.getLatexLabel("log_{10} ")
-                        trainingSetVariable = numpy.log10(trainingSetVariable)
-                        trainingSetVariable = Data.dropInfNanFromDataFrame(trainingSetVariable)
-                    else:
-                        loga = ""
+                    if variable in aeroNumberVariables:
+                        trainingSetVariable = trainingSetVariable*1e-6
+                    if variable == reff:
+                        trainingSetVariable = trainingSetVariable*1e9
+                    
+                    trainingSetVariable = Data.dropInfNanFromDataFrame(trainingSetVariable)
+                    
+                    
                     
                     minimi = numpy.nanmin([minimi, trainingSetVariable.min()])
                     maximi = numpy.nanmax( [maximi, trainingSetVariable.max()])
+                    
+                    minisDesigns[ind] = minimi
+                    maxisDesigns[ind] = maximi
                     trainingSetVariable.plot.density(ax = ax, color = self.trainingSetColors[trainingSet])
                     
-                    variableSpecs = f"""{PlotTweak.getLatexLabel(f'min={trainingSetVariable.min():.2f}')}
-{PlotTweak.getLatexLabel(f'{meanStr}={trainingSetVariable.mean():.2f}')}
-{PlotTweak.getLatexLabel(f'{stdStr}={trainingSetVariable.std():.2f}')}
-{PlotTweak.getLatexLabel(f'max={trainingSetVariable.max():.2f}')}"""
+                    if variable in (aeroNumberVariables + [reff , "cdnc"]):
+                        print(f"{variable} {trainingSet} mean {trainingSetVariable.mean():.2f} {trainingSet} median {trainingSetVariable.median():.2f}")
                     
-                    if not hasattr(self, "filteredSourceData") and isAnnotated:
-                        ax.annotate( variableSpecs, xy=specsPositions[ind], size=8, bbox = dict(pad = 0.6, fc="w", ec="w", alpha=0.9), xycoords = "axes fraction")
-                        isAnnotated = False
             
             variableAnnotationYposition = 0.9
             
             if variable == "cos_mu":
                 annotationOfVariable = PlotTweak.getMathLabel(variable)
-            elif variable in ["as", "ks", "cs"]:
-                
-                annotationOfVariable = r"$\mathbf{" rf"{PlotTweak.getMathLabelFromDict(variable)}" r"}$" "\n" fr"(${PlotTweak.getVariableUnit(variable)}$)"
-                variableAnnotationYposition = 0.80
+
             else:
                 annotationOfVariable = PlotTweak.getUnitLabel(PlotTweak.getMathLabelFromDict(variable), PlotTweak.getVariableUnit(variable))
                 
-            annotation = f"({Data.getNthLetter(ind)}) {loga}{annotationOfVariable}"
+            annotation = f"({Data.getNthLetter(ind)}) {annotationOfVariable}"
             PlotTweak.setAnnotation(ax, annotation,
-                                    xPosition =  0.05,
+                                    xPosition =  0.2,
                                     yPosition = variableAnnotationYposition,
                                     xycoords = "axes fraction") 
             ax.set_ylabel("")
+            
             ax.set_xlim([minimi, maximi])
             ax.set_ylim([0,ax.get_ylim()[1]])
             
@@ -713,6 +715,31 @@ class ManuscriptFigures(EmulatorMetaData):
         artist = ax.legend( handles=legendLabelColors, loc=(0.0, 0.00), frameon = True, framealpha = 1.0, ncol = 1 )
 
         ax.add_artist(artist)
+        
+        for ind,variable in enumerate(self.designVariablePool):
+            ax = fig.getAxes(ind)
+            
+            
+            variableSpecs = f"""{PlotTweak.getLatexLabel(f'min={minisDesigns[ind]:.2f}')}
+{PlotTweak.getLatexLabel(f'max={maxisDesigns[ind]:.2f}')}"""
+
+            ax.annotate( variableSpecs, xy=specsPositions[ind], size=8, bbox = dict(pad = 0.6, fc="w", ec="w", alpha=0.9), xycoords = "axes fraction")
+            
+            if ind in [1,2,3]:
+                ax.set_xlim([0,maxisDesigns[ind]])
+            if ind in [5, 6,7,8]:
+                limits = {5:200,  6:1000, 7:300, 8:15}
+                ax.set_xlim([0,limits[ind]])
+                matplotlib.pyplot.setp(ax.get_xticklabels()[-1], visible=False)
+            if ind == 10:
+                ax.set_xlim([0,1])
+                label_format = '{:,.2f}'
+                ticks_loc = ax.get_xticks().tolist()
+                ax.xaxis.set_major_locator(mticker.FixedLocator(ticks_loc))
+                xticklabels =[label_format.format(x) for x in ticks_loc]
+                xticklabels[0] = "0"
+                xticklabels[-1] = "1"
+                ax.set_xticklabels(xticklabels)
         
     
     def table_featureImportanceStats(self):
@@ -815,7 +842,7 @@ def main():
     try:
         locationsFile = sys.argv[1]
     except IndexError:
-        locationsFile = "/home/aholaj/mounttauskansiot/puhtiwork/EmulatorManuscriptData/locations_local_puhti_mounted.yaml"
+        locationsFile = "/home/aholaj/mounttauskansiot/puhtiwork/EmulatorManuscriptData_3/locationsMounted.yaml"
         
     figObject = ManuscriptFigures(locationsFile)
 
