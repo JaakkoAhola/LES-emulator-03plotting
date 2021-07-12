@@ -43,7 +43,7 @@ class MethodFigures:
 
 
 
-        fig = Figure(self.figurefolder,"figureProfileExample", figsize=[4.724409448818897, 4], ncols = 2, nrows = 1, wspace =0.15, bottom = 0.13, left=0.14)
+        fig = Figure(self.figurefolder,"figureProfileExample", figsize=[8.3/2.54, 2.5], ncols = 2, nrows = 1, wspace =0.15, bottom = 0.18, left=0.20)
         print(fig.getFigSize())
         colorList = [Colorful.getDistinctColorList("red"), Colorful.getDistinctColorList("blue")]
         variables = ["temperature", "water"]
@@ -67,9 +67,10 @@ class MethodFigures:
         t_grad = 0.3
         invThi = tpot_inv / t_grad
 
-        print("pblh", pblh)
+        print("pblh", pblh, self.soundIN["height"].max())
 
-        maxheight = Data.roundUp(self.soundIN["height"].max(), 100)
+        maxheight = Data.roundUpToScale(self.soundIN["height"].max(), 100)
+        print("pblh", pblh, self.soundIN["height"].max(), maxheight)
 
         minTemp = Data.roundDown(self.soundIN["temperature"].min(), 1)
         maxTemp = Data.roundUp(self.soundIN["temperature"].max(), 1)
@@ -79,11 +80,14 @@ class MethodFigures:
         maxWaterAxes = Data.roundUp(self.soundIN["water"].max(), 1)
 
         print("maxWater", self.soundIN["water"].max())
-
+        lineWidthProfile = 1.4
+        lineWidthDash = 1.4
+        lineWidthArrow  = 1.4
+        annotationYCoord = 0.87
         for ind in range(2):
             ax = fig.getAxes(ind)
 
-            self.soundIN.plot(ax=ax,x=variables[ind], y="height", color = colorList[ind], legend = False, linewidth = 2)
+            self.soundIN.plot(ax=ax,x=variables[ind], y="height", color = colorList[ind], legend = False, linewidth = lineWidthProfile)
 
             ax.set_ylim([0, maxheight])
 
@@ -112,34 +116,34 @@ class MethodFigures:
                 xPoint = (xmax-xmin)*0.2+xmin
                 yPoint = k_rate*(xPoint-tpot_pbl)
 
-                PlotTweak.setAnnotation(ax, "(a) Temperature profile", xPosition = (xmax-xmin)*0.05 + xmin, yPosition = (ymax-ymin)*0.95+ymin)
+                PlotTweak.setAnnotation(ax, "(a) Temperature\nprofile", xPosition =0.03, yPosition =annotationYCoord, xycoords="axes fraction")
 
-                ax.axvline(tpot_pbl + tpot_inv , color = "k" , linestyle = "--" , ymax = (pblh + invThi)/ymax)
+                ax.axvline(tpot_pbl + tpot_inv , color = "k" , linestyle = "--" , ymax = (pblh + invThi)/ymax, linewidth=lineWidthDash) 
 
                 # ax.arrow(xPoint, yPoint, tpot_pbl-xPoint, 0-yPoint,
                 #           facecolor='black', shape = "full", linewidth = param, head_length = param*1.5*3., head_width = 3.*param, overhang = 0.1, head_starts_at_zero = True, length_includes_head = True)
                 ax.annotate(PlotTweak.getMathLabel("tpot_pbl"),
                             xy=(tpot_pbl, 0),
                             xytext = (xPoint, yPoint),
-                            arrowprops=dict(facecolor='black', arrowstyle = "->", linewidth = 1.5),
+                            arrowprops=dict(facecolor='black', arrowstyle = "->", linewidth = lineWidthArrow),
                             horizontalalignment='left',
                             verticalalignment='bottom'
                             )
                 #ax.text((xPoint-tpot_pbl)*0.6 + tpot_pbl, (yPoint- ymin)*0.3 + ymin,  PlotTweak.getMathLabel("tpot_pbl"))
-                arrowParam = 0.3
+                arrowParam = 0.25
                 pblhArrowX = (xmax - (tpot_pbl + tpot_inv))*arrowParam + (tpot_pbl + tpot_inv)
                 pblhArrowXText = (xmax - (tpot_pbl + tpot_inv))*arrowParam*1.5 + (tpot_pbl + tpot_inv)
                 ax.annotate("",
                             xy=( pblhArrowX, pblh),
                             xytext=(pblhArrowX, 0),
-                            arrowprops = dict(arrowstyle = "<->",facecolor='black', linewidth = 1.5))
-                ax.text(pblhArrowXText, pblh*0.43,  "PBLH", rotation =90)
+                            arrowprops = dict(arrowstyle = "<->",facecolor='black', linewidth = lineWidthArrow))
+                ax.text(pblhArrowXText, pblh*0.43,  PlotTweak.getMathLabel("pblh"), rotation =90)
 
-                ax.text(tpot_pbl+tpot_inv*0.40, pblh*0.43,  PlotTweak.getMathLabel("tpot_inv"))
+                ax.text(tpot_pbl+tpot_inv*0.40, pblh*0.41,  PlotTweak.getMathLabel("tpot_inv"))
                 ax.annotate("",
                             xy=(tpot_pbl, pblh*0.5),
                             xytext=(tpot_pbl + tpot_inv, pblh*0.5),
-                            arrowprops = dict(arrowstyle = "<->",facecolor='black', linewidth = 1.5))
+                            arrowprops = dict(arrowstyle = "<->",facecolor='black', linewidth = lineWidthArrow))
 
             else:
 
@@ -164,7 +168,7 @@ class MethodFigures:
                 ymin = ax.get_ylim()[0]
                 ymax = ax.get_ylim()[1]
 
-                PlotTweak.setAnnotation(ax, "(b) Humidity profile", xPosition = (xmax-xmin)*0.17 + xmin, yPosition = (ymax-ymin)*0.95+ymin )
+                PlotTweak.setAnnotation(ax, "(b) Humidity\nprofile", xPosition = 0.20, yPosition = annotationYCoord, xycoords="axes fraction" )
 
                 ax.axvline(r_t - q_inv , color = "k" , linestyle = "--" , ymax = (pblh + invThi)/ymax)
 
@@ -176,15 +180,15 @@ class MethodFigures:
                 ax.annotate(PlotTweak.getLatexLabel("r_t"),
                             xy=(self.soundIN["water"].max()*0.99, 0),
                             xytext = (xPoint, yPoint),
-                            arrowprops=dict(facecolor='black', arrowstyle = "->", linewidth = 1.5),
+                            arrowprops=dict(facecolor='black', arrowstyle = "->", linewidth = lineWidthArrow),
                             horizontalalignment='left',
                             verticalalignment='bottom'
                             )
                 ax.annotate("",
                             xy=(r_t-q_inv, pblh*0.5),
                             xytext=(r_t, pblh*0.5),
-                            arrowprops = dict(arrowstyle = "<->",facecolor='black', linewidth = 1.5))
-                ax.text(r_t-q_inv*0.60, pblh*0.43,  PlotTweak.getMathLabel("q_inv"))
+                            arrowprops = dict(arrowstyle = "<->",facecolor='black', linewidth = lineWidthArrow))
+                ax.text(r_t-q_inv*0.60, pblh*0.41,  PlotTweak.getMathLabel("q_inv"))
 
             yticks = PlotTweak.setYticks(ax, start= 0, end = maxheight, interval = 100, integer=True)
 
@@ -192,30 +196,13 @@ class MethodFigures:
 
             PlotTweak.setYTickSizes(ax, yShownLabelsBoolean)
 
-            # yTicks = numpy.arange(0, 0.51, 0.1)
-            # yTickLabels = [f"{t:.1f}" for t in yTicks]
-            #
-            # ax.set_yticklabels(yTickLabels)
-            # ax.set_ylim([0, 0.5])
-            # PlotTweak.setAnnotation(ax, self.annotationCollection[trainingSet], xPosition=ax.get_xlim()[1]*0.20, yPosition = ax.get_ylim()[1]*0.90)
-            # PlotTweak.setXaxisLabel(ax,"")
-
-
-
-
-        # fig.getAxes(0).legend(handles=PlotTweak.getPatches(legendLabelColors),
-        #                         title = "Global variance -based sensitivity for " + PlotTweak.getLatexLabel("w_{pos}", False),
-        #               loc=(-0.2,-2.6),
-        #               ncol = 4,
-        #               fontsize = 8)
-
         fig.save()
 
 if __name__ == "__main__":
     start = time.time()
 
-    figObject = MethodFigures( "/home/aholaj/mounttauskansiot/eclairmount/case_emulator_DESIGN_v3.2_LES_ECLAIR_branch_ECLAIRv2.0.cray.fast_LVL4_night/emul040",
-                                  os.environ["EMULATORFIGUREFOLDER"])
+    figObject = MethodFigures( "/home/aholaj/mounttauskansiot/puhtiwork/eclair_training_simulations/case_emulator_DESIGN_v3.2_LES_ECLAIR_branch_ECLAIRv2.0.cray.fast_LVL4_night/emul040",
+                                  "/home/aholaj/mounttauskansiot/puhtiwork/EmulatorManuscriptData_3/figures")
 
     figObject.figureProfileExample()
     end = time.time()
