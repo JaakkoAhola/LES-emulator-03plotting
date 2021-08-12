@@ -167,10 +167,10 @@ class ManuscriptFigures(EmulatorMetaData):
                 self.allLabels += ines
                 
                 subset = pandas.DataFrame(data =  {"Mean" : mean.values, "Std": std.values}, index = ines).dropna()
-                try:
-                    subset = subset.drop(index="rainProduction_linearFit")
-                except:
-                    pass
+                
+                for indexName in subset.index:
+                    if "_linearFit" in indexName:
+                        subset = subset.drop(indexName)
                 
                 subset["mathLabel"] = subset.apply(lambda row: PlotTweak.getMathLabel(row.name), axis = 1)
 
