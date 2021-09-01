@@ -311,7 +311,7 @@ class ManuscriptFigures(EmulatorMetaData):
         ncols = len(self.featureImportanceDataCollection[list(self.featureImportanceDataCollection)[0]]) # number of methods
         nrows = len(self.featureImportanceDataCollection) # = number of training sets
 
-        self.figures["figureFeatureImportanceBar"] = Figure(self.figureFolder,"figureFeatureImportanceBar",
+        self.figures["figureFeatureImportanceBar"] = Figure(self.figureFolder,"figure6",
                                                             figsize=[self.figureWidth,6], 
                                                             ncols = ncols, nrows = nrows,
                                                             hspace=0.8, bottom=0.20, wspace = 0.05, top = 0.97)
@@ -370,7 +370,7 @@ class ManuscriptFigures(EmulatorMetaData):
     
     def figurePredictorsVsSimulated(self):
         numberOfMethods = 3
-        self.figures["figurePredictorsVsSimulated"] = Figure(self.figureFolder,"figurePredictorsVsSimulated",
+        self.figures["figurePredictorsVsSimulated"] = Figure(self.figureFolder,"figure5",
                                                    figsize = [self.figureWidth, 7],  ncols = numberOfMethods, nrows = 4,
                                                    bottom = 0.07, hspace = 0.09, wspace=0.10, top=0.95, left=0.16, right = 0.98)
         fig = self.figures["figurePredictorsVsSimulated"]
@@ -468,7 +468,7 @@ class ManuscriptFigures(EmulatorMetaData):
                 ax.text(-0.1,-0.27,PlotTweak.getUnitLabel("Simulated\ w_{pos}", "m\ s^{-1}") , size=8)
 
     def figureSimulatedUpdraft_vs_CloudRadiativeCooling(self):
-        self.__figureUpdraft_vs_CloudRadiativeCooling(self.responseVariable, {"fig" : "figureSimulatedUpdraft_vs_CloudRadiativeCooling", "legend" : "Simulated"}, Colorful.getDistinctColorList("orange"))
+        self.__figureUpdraft_vs_CloudRadiativeCooling(self.responseVariable, {"fig" : "figure4", "legend" : "Simulated"}, Colorful.getDistinctColorList("orange"))
     def figureLinearFitUpdraft_vs_CloudRadiativeCooling(self):
         self.__figureUpdraft_vs_CloudRadiativeCooling(self.linearFitVariable, {"fig" : "figureLinearFitUpdraft_vs_CloudRadiativeCooling", "legend" : self.predictorClearNames["linearFit"]}, Colorful.getDistinctColorList("red"))
         
@@ -591,7 +591,7 @@ class ManuscriptFigures(EmulatorMetaData):
         nrows = 4
         ncols = ceil(len(self.designVariablePool) / nrows)
         
-        self.figures["figureDesignVariables"] = Figure(self.figureFolder,"figureDesignVariables",
+        self.figures["figureDesignVariables"] = Figure(self.figureFolder,"figure2",
                                                    figsize = [self.figureWidth, 7],  ncols = ncols, nrows = nrows,
                                                    bottom = 0.04, hspace = 0.17, wspace=0.07, top=0.98, left=0.05, right = 0.99)
         fig = self.figures["figureDesignVariables"]
@@ -845,30 +845,35 @@ def main():
         locationsFile = "/home/aholaj/mounttauskansiot/puhtiwork/EmulatorManuscriptData_3/locationsMounted.yaml"
         
     figObject = ManuscriptFigures(locationsFile)
-
+    
+    printTables = False
     if True:
+        #figure6
         figObject.initReadFeatureImportanceData()
         figObject.figureBarFeatureImportanceData()
-        figObject.tables_featureImportanceOrder()
-        figObject.table_featureImportanceStats()
+        if printTables: figObject.tables_featureImportanceOrder()
+        if printTables: figObject.table_featureImportanceStats()
     if True:
+        #figure4
         figObject.figureSimulatedUpdraft_vs_CloudRadiativeCooling()
         
         
     if True:
+        #figure5
         figObject.figurePredictorsVsSimulated()
-        figObject.tables_predictorsVsSimulated()
+        if printTables: figObject.tables_predictorsVsSimulated()
     
     if True:
-        figObject.tables_bootstraps()
+        if printTables: figObject.tables_bootstraps()
         
     if True:
+        #figure2
         figObject.initReadFilteredSourceData()
         figObject.figureDesignVariables()
         
         
     figObject.finalise()
-    figObject.finaliseLatexTables()
+    if printTables: figObject.finaliseLatexTables()
 
 if __name__ == "__main__":
     start = time.time()

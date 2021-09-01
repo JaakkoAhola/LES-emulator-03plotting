@@ -43,7 +43,7 @@ class MethodFigures:
 
 
 
-        fig = Figure(self.figurefolder,"figureProfileExample", figsize=[8.3/2.54, 2.5], ncols = 2, nrows = 1, wspace =0.15, bottom = 0.18, left=0.20)
+        fig = Figure(self.figurefolder,"figure3", figsize=[8.3/2.54, 2.5], ncols = 2, nrows = 1, wspace =0.15, bottom = 0.18, left=0.20)
         print(fig.getFigSize())
         colorList = [Colorful.getDistinctColorList("red"), Colorful.getDistinctColorList("blue")]
         variables = ["temperature", "water"]
@@ -148,7 +148,7 @@ class MethodFigures:
             else:
 
 
-                PlotTweak.setXaxisLabel(ax,"r_t", "g\ kg^{-1}")
+                PlotTweak.setXaxisLabel(ax,"q_t", "g\ kg^{-1}")
                 PlotTweak.hideYTickLabels(ax)
 
                 xticks = numpy.arange(minWater, maxWaterAxes + 0.001, 1)
@@ -177,7 +177,7 @@ class MethodFigures:
                 xPoint = self.soundIN["water"].max()*.8
                 yPoint = k_rate*(xPoint-self.soundIN["water"].max())
 
-                ax.annotate(PlotTweak.getLatexLabel("r_t"),
+                ax.annotate(PlotTweak.getLatexLabel("q_t"),
                             xy=(self.soundIN["water"].max()*0.99, 0),
                             xytext = (xPoint, yPoint),
                             arrowprops=dict(facecolor='black', arrowstyle = "->", linewidth = lineWidthArrow),
