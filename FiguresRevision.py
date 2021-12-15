@@ -17,6 +17,7 @@ import sys
 from scipy import stats
 import time
 from datetime import datetime
+from copy import deepcopy
 
 sys.path.append(os.environ["LESMAINSCRIPTS"])
 from Colorful import Colorful
@@ -119,6 +120,94 @@ class FiguresRevision(ManuscriptFigures):
             if ind == 0:
                 current_axes.text(PlotTweak.getXPosition(current_axes, -0.25), PlotTweak.getYPosition(current_axes, -0.25),
                                   "Frequency", size=8, rotation=90)
+
+    def figure_lwp_scatter_plot(self):
+        name = "figure_lwp_scatter_plot"
+        self.figures[name] = Figure(self.figureFolder,name, figsize = [self.figureWidth, 4],
+                                    ncols=2, nrows=2,
+                                    hspace=0.08, wspace=0.12,
+                                    bottom=0.11, top=0.93,
+                                    )
+
+        fig = self.figures[name]
+        blue_color = Colorful.getDistinctColorList("blue")
+        # red_color = Colorful.getDistinctColorList("red")
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            current_axes = fig.getAxes(ind)
+
+            dataframe_filtered = deepcopy(self.completeDataFrameFiltered[trainingSet])
+            dataframe_filtered["total_wp"] = dataframe_filtered.apply(lambda row:\
+                                                    (row["rwp_last_hour"] + row["lwp_last_hour"])*1e3,
+                                                    axis=1)
+
+            print("lwp", trainingSet, dataframe_filtered["total_wp"].max(), dataframe_filtered["lwp"].max())
+
+            dataframe_filtered.plot.scatter(x="lwp",
+                                            y="total_wp",
+                                            ax=current_axes,
+                                            color = blue_color,
+                                            alpha=0.3)
+
+            current_axes.axline([0, 0], [1, 1], color="k")
+
+        # tweaks
+        start = 0.0
+        end = 800
+        interval = 100
+        ticks = numpy.arange(0, end + .01, interval)
+        tickLabels = [f"{t:.0f}" for t in ticks]
+
+        showList = Data.cycleBoolean(len(ticks))
+
+        showList[0] = True
+        showList[-1] = False
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            current_axes = fig.getAxes(ind)
+
+            current_axes.set_xlim([start, end])
+            PlotTweak.setYaxisLabel(current_axes,"")
+            PlotTweak.setXaxisLabel(current_axes,"")
+
+
+
+            if ind in [0,1]:
+                PlotTweak.hideXTickLabels(current_axes)
+            if ind in [1,3]:
+                PlotTweak.hideYTickLabels(current_axes)
+
+            current_axes.set_xticks(ticks)
+            current_axes.set_xticklabels(tickLabels)
+            PlotTweak.hideLabels(current_axes.xaxis, showList)
+
+            current_axes.set_yticks(ticks)
+            current_axes.set_yticklabels(tickLabels)
+            PlotTweak.hideLabels(current_axes.yaxis, showList)
+
+            PlotTweak.setAnnotation(current_axes,
+                                    self.annotationCollection[trainingSet],
+                                    xPosition=PlotTweak.getXPosition(current_axes, 0.05),
+                                    yPosition = PlotTweak.getYPosition(current_axes, 0.9))
+
+            if ind == 0:
+                collectionOfLabelsColors = {"Total water path (LWP + RWP) change" : blue_color,
+                                            #"LWP relative change (all LES data)" : red_color,
+                                            }
+                legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
+
+                artist = current_axes.legend(handles=legendLabelColors,
+                                             loc=(0.0, 1.03),
+                                             frameon=True,
+                                             framealpha=1.0,
+                                             ncol=1)
+
+                current_axes.add_artist(artist)
+
+            if ind == 3:
+                current_axes.text(PlotTweak.getXPosition(current_axes, -0.7), PlotTweak.getYPosition(current_axes, -0.25),
+                                   PlotTweak.getUnitLabel("Total\ water\ path\ in\ the\ beginning", PlotTweak.getVariableUnit("lwp")), size=8)
+            if ind == 0:
+                current_axes.text(PlotTweak.getXPosition(current_axes, -0.27), PlotTweak.getYPosition(current_axes, -0.8),
+                                  PlotTweak.getUnitLabel("Total\ water\ path\ average\ of\ last\ hour", PlotTweak.getVariableUnit("lwp")), size=8, rotation=90)
 
 
     def figure_surface_precipitation_accumulated(self):
@@ -312,6 +401,7 @@ def main():
     figObject.figure_relative_relative_change_lwp()
     figObject.figure_surface_precipitation_accumulated()
     figObject.figure_rwp_last_hour()
+    figObject.figure_lwp_scatter_plot()
 
     figObject.finalise()
 
