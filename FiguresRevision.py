@@ -59,7 +59,7 @@ class FiguresRevision(ManuscriptFigures):
         # tweaks
         start = 0.0
         end = 2.0
-        ticks = numpy.arange(0, end + .01, 0.5)
+        ticks = numpy.arange(start, end + .01, 0.5)
         tickLabels = [f"{t:.1f}" for t in ticks]
 
         showList = Data.cycleBoolean(len(ticks))
@@ -70,12 +70,12 @@ class FiguresRevision(ManuscriptFigures):
             current_axes = fig.getAxes(ind)
 
             if "4" in trainingSet:
-                yticks = numpy.arange(0, 151, 25)
-                ytickLabels = [f"{t:d}" for t in yticks]
+                yticks = numpy.arange(start, 151, 25)
+                ytickLabels = [f"{t:.0f}" for t in yticks]
 
             else:
-                yticks = numpy.arange(0, 501, 100)
-                ytickLabels = [f"{t:d}" for t in yticks]
+                yticks = numpy.arange(start, 501, 100)
+                ytickLabels = [f"{t:.0f}" for t in yticks]
 
             yshowList = Data.cycleBoolean(len(yticks))
             yshowList[-1] =False
@@ -135,26 +135,19 @@ class FiguresRevision(ManuscriptFigures):
         for ind, trainingSet in enumerate(self.trainingSetList):
             current_axes = fig.getAxes(ind)
 
-            dataframe_filtered = deepcopy(self.completeDataFrameFiltered[trainingSet])
-            dataframe_filtered["total_wp"] = dataframe_filtered.apply(lambda row:\
-                                                    (row["rwp_last_hour"] + row["lwp_last_hour"])*1e3,
-                                                    axis=1)
-
-            print("lwp", trainingSet, dataframe_filtered["total_wp"].max(), dataframe_filtered["lwp"].max())
+            dataframe_filtered = self.completeDataFrameFiltered[trainingSet]
 
             dataframe_filtered.plot.scatter(x="lwp",
-                                            y="total_wp",
+                                            y="total_water_path_last_hour_mean",
                                             ax=current_axes,
                                             color = blue_color,
                                             alpha=0.3)
-
-            current_axes.axline([0, 0], [1, 1], color="k")
 
         # tweaks
         start = 0.0
         end = 800
         interval = 100
-        ticks = numpy.arange(0, end + .01, interval)
+        ticks = numpy.arange(start, end + .01, interval)
         tickLabels = [f"{t:.0f}" for t in ticks]
 
         showList = Data.cycleBoolean(len(ticks))
@@ -165,6 +158,7 @@ class FiguresRevision(ManuscriptFigures):
             current_axes = fig.getAxes(ind)
 
             current_axes.set_xlim([start, end])
+            current_axes.axline([0, 0], [1, 1], color="k")
             PlotTweak.setYaxisLabel(current_axes,"")
             PlotTweak.setXaxisLabel(current_axes,"")
 
@@ -238,23 +232,23 @@ class FiguresRevision(ManuscriptFigures):
                 start = 0.0
                 end = 4e-4
                 interval = 1e-4
-                ticks = numpy.arange(0, end + interval, interval)
+                ticks = numpy.arange(start, end + interval, interval)
                 tickLabels = [f"{t:.0e}" for t in ticks]
                 tickLabels[0] = "0"
 
-                yticks = numpy.arange(0, 151, 25)
-                ytickLabels = [f"{t:d}" for t in yticks]
+                yticks = numpy.arange(start, 151, 25)
+                ytickLabels = [f"{t:.0f}" for t in yticks]
 
             else:
                 start = 0.0
                 end = 4e-3
                 interval = 1e-3
-                ticks = numpy.arange(0, end + interval, interval)
+                ticks = numpy.arange(start, end + interval, interval)
                 tickLabels = [f"{t:.0e}" for t in ticks]
                 tickLabels[0] = "0"
 
-                yticks = numpy.arange(0, 501, 100)
-                ytickLabels = [f"{t:d}" for t in yticks]
+                yticks = numpy.arange(start, 501, 100)
+                ytickLabels = [f"{t:.0f}" for t in yticks]
 
 
             showList = Data.cycleBoolean(len(ticks))
@@ -323,8 +317,8 @@ class FiguresRevision(ManuscriptFigures):
         start = 0.0
         end = 150
         interval = 25
-        ticks = numpy.arange(0, end + interval, interval)
-        tickLabels = [f"{t:d}" for t in ticks]
+        ticks = numpy.arange(start, end + interval, interval)
+        tickLabels = [f"{t:.0f}" for t in ticks]
 
         showList = Data.cycleBoolean(len(ticks))
 
@@ -334,12 +328,12 @@ class FiguresRevision(ManuscriptFigures):
             current_axes = fig.getAxes(ind)
 
             if "4" in trainingSet:
-                yticks = numpy.arange(0, 151, 25)
-                ytickLabels = [f"{t:d}" for t in yticks]
+                yticks = numpy.arange(start, 151, 25)
+                ytickLabels = [f"{t:.0f}" for t in yticks]
 
             else:
-                yticks = numpy.arange(0, 501, 100)
-                ytickLabels = [f"{t:d}" for t in yticks]
+                yticks = numpy.arange(start, 501, 100)
+                ytickLabels = [f"{t:.0f}" for t in yticks]
 
 
             yshowList = Data.cycleBoolean(len(yticks))
@@ -390,6 +384,410 @@ class FiguresRevision(ManuscriptFigures):
                 current_axes.text(PlotTweak.getXPosition(current_axes, -0.3), PlotTweak.getYPosition(current_axes, -0.25),
                                   "Frequency", size=8, rotation=90)
 
+    def figure_cloud_top_scatter_plot(self):
+        name = "figure_cloud_top_scatter_plot"
+        self.figures[name] = Figure(self.figureFolder,name, figsize = [self.figureWidth, 4],
+                                    ncols=2, nrows=2,
+                                    hspace=0.08, wspace=0.12,
+                                    bottom=0.11, top=0.87,
+                                    left=0.15
+                                    )
+
+        fig = self.figures[name]
+        blue_color = Colorful.getDistinctColorList("blue")
+        red_color = Colorful.getDistinctColorList("red")
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            current_axes = fig.getAxes(ind)
+
+            dataframe = self.completeDataFrame[trainingSet]
+            mask = ~dataframe[self.filterIndex]
+
+            filtered_out = deepcopy(dataframe[mask])
+
+            dataframe_filtered = self.completeDataFrameFiltered[trainingSet]
+
+            disapeared_cloud_index = filtered_out[filtered_out["zc_end_value"]<0].index
+
+            filtered_out.loc[disapeared_cloud_index, "zc_end_value"] = 0
+
+            filtered_out.plot.scatter(x="zc_first",
+                                      y="zc_end_value",
+                                      ax=current_axes,
+                                      color=red_color,
+                                      alpha=0.3)
+
+            dataframe_filtered.plot.scatter(x="zc_first",
+                                            y="zc_end_value",
+                                            ax=current_axes,
+                                            color = blue_color,
+                                            alpha=0.3)
+
+            current_axes.axline([0, 0], [1, 1], color="k")
+
+        # tweaks
+        start = 0.0
+        end = 3000
+        interval = 500
+        ticks = numpy.arange(start, end + .01, interval)
+        tickLabels = [f"{t:.0f}" for t in ticks]
+
+        showList = Data.cycleBoolean(len(ticks))
+
+        showList[0] = True
+        showList[-1] = False
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            current_axes = fig.getAxes(ind)
+
+            current_axes.set_xlim([start, end])
+            current_axes.set_ylim([start, end])
+            PlotTweak.setYaxisLabel(current_axes,"")
+            PlotTweak.setXaxisLabel(current_axes,"")
+
+
+
+            if ind in [0,1]:
+                PlotTweak.hideXTickLabels(current_axes)
+            if ind in [1,3]:
+                PlotTweak.hideYTickLabels(current_axes)
+
+            current_axes.set_xticks(ticks)
+            current_axes.set_xticklabels(tickLabels)
+            PlotTweak.hideLabels(current_axes.xaxis, showList)
+
+            current_axes.set_yticks(ticks)
+            current_axes.set_yticklabels(tickLabels)
+            PlotTweak.hideLabels(current_axes.yaxis, showList)
+
+            PlotTweak.setAnnotation(current_axes,
+                                    self.annotationCollection[trainingSet],
+                                    xPosition=PlotTweak.getXPosition(current_axes, 0.05),
+                                    yPosition = PlotTweak.getYPosition(current_axes, 0.9))
+
+            if ind == 0:
+                collectionOfLabelsColors = {"Cloud top change" : blue_color,
+                                            "Cloud top change (filtered out)" : red_color,
+                                            }
+                legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
+
+                artist = current_axes.legend(handles=legendLabelColors,
+                                             loc=(0.0, 1.03),
+                                             frameon=True,
+                                             framealpha=1.0,
+                                             ncol=1)
+
+                current_axes.add_artist(artist)
+
+            if ind == 3:
+                current_axes.text(PlotTweak.getXPosition(current_axes, -0.7), PlotTweak.getYPosition(current_axes, -0.25),
+                                   PlotTweak.getUnitLabel("Cloud\ top\ height\ in\ the\ beginning", "m"), size=8)
+            if ind == 0:
+                current_axes.text(PlotTweak.getXPosition(current_axes, -0.33), PlotTweak.getYPosition(current_axes, -0.8),
+                                  PlotTweak.getUnitLabel("Cloud\ top\ height\ in\ the\ end", "m"), size=8, rotation=90)
+
+
+    def figure_cloud_base_scatter_plot(self):
+        name = "figure_cloud_base_scatter_plot"
+        self.figures[name] = Figure(self.figureFolder,name, figsize = [self.figureWidth, 4],
+                                    ncols=2, nrows=2,
+                                    hspace=0.08, wspace=0.12,
+                                    bottom=0.11, top=0.87,
+                                    left=0.15
+                                    )
+
+        fig = self.figures[name]
+        blue_color = Colorful.getDistinctColorList("blue")
+        red_color = Colorful.getDistinctColorList("red")
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            current_axes = fig.getAxes(ind)
+
+            dataframe = self.completeDataFrame[trainingSet]
+            mask = ~dataframe[self.filterIndex]
+
+            filtered_out = deepcopy(dataframe[mask])
+
+            dataframe_filtered = self.completeDataFrameFiltered[trainingSet]
+
+            disapeared_cloud_index = filtered_out[filtered_out["zb_end_value"]<0].index
+
+            filtered_out.loc[disapeared_cloud_index, "zb_end_value"] = 0
+
+            filtered_out.plot.scatter(x="zb_first",
+                                      y="zb_end_value",
+                                      ax=current_axes,
+                                      color=red_color,
+                                      alpha=0.3)
+
+            dataframe_filtered.plot.scatter(x="zb_first",
+                                            y="zb_end_value",
+                                            ax=current_axes,
+                                            color = blue_color,
+                                            alpha=0.3)
+
+            current_axes.axline([0, 0], [1, 1], color="k")
+
+        # tweaks
+        start = 0.0
+        end = 3000
+        interval = 500
+        ticks = numpy.arange(start, end + .01, interval)
+        tickLabels = [f"{t:.0f}" for t in ticks]
+
+        showList = Data.cycleBoolean(len(ticks))
+
+        showList[0] = True
+        showList[-1] = False
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            current_axes = fig.getAxes(ind)
+
+            current_axes.set_xlim([start, end])
+            current_axes.set_ylim([start, end])
+            PlotTweak.setYaxisLabel(current_axes,"")
+            PlotTweak.setXaxisLabel(current_axes,"")
+
+
+
+            if ind in [0,1]:
+                PlotTweak.hideXTickLabels(current_axes)
+            if ind in [1,3]:
+                PlotTweak.hideYTickLabels(current_axes)
+
+            current_axes.set_xticks(ticks)
+            current_axes.set_xticklabels(tickLabels)
+            PlotTweak.hideLabels(current_axes.xaxis, showList)
+
+            current_axes.set_yticks(ticks)
+            current_axes.set_yticklabels(tickLabels)
+            PlotTweak.hideLabels(current_axes.yaxis, showList)
+
+            PlotTweak.setAnnotation(current_axes,
+                                    self.annotationCollection[trainingSet],
+                                    xPosition=PlotTweak.getXPosition(current_axes, 0.05),
+                                    yPosition = PlotTweak.getYPosition(current_axes, 0.9))
+
+            if ind == 0:
+                collectionOfLabelsColors = {"Cloud base change" : blue_color,
+                                            "Cloud base change (filtered out)" : red_color,
+                                            }
+                legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
+
+                artist = current_axes.legend(handles=legendLabelColors,
+                                             loc=(0.0, 1.03),
+                                             frameon=True,
+                                             framealpha=1.0,
+                                             ncol=1)
+
+                current_axes.add_artist(artist)
+
+            if ind == 3:
+                current_axes.text(PlotTweak.getXPosition(current_axes, -0.7), PlotTweak.getYPosition(current_axes, -0.25),
+                                   PlotTweak.getUnitLabel("Cloud\ base\ height\ in\ the\ beginning", "m"), size=8)
+            if ind == 0:
+                current_axes.text(PlotTweak.getXPosition(current_axes, -0.33), PlotTweak.getYPosition(current_axes, -0.8),
+                                  PlotTweak.getUnitLabel("Cloud\ base\ height\ in\ the\ end", "m"), size=8, rotation=90)
+
+
+    def figure_mixed_layer_cloud_thickness_vs_cloud_top_height_scatter_plot(self):
+        name = "figure_mixed_layer_cloud_thickness_vs_cloud_top_height_scatter_plot"
+        self.figures[name] = Figure(self.figureFolder,name, figsize = [self.figureWidth, 4],
+                                    ncols=2, nrows=2,
+                                    hspace=0.08, wspace=0.12,
+                                    bottom=0.11, top=0.87,
+                                    left=0.15
+                                    )
+
+        fig = self.figures[name]
+        blue_color = Colorful.getDistinctColorList("blue")
+        red_color = Colorful.getDistinctColorList("red")
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            current_axes = fig.getAxes(ind)
+
+            dataframe = self.completeDataFrame[trainingSet]
+            mask = ~dataframe[self.filterIndex]
+
+            filtered_out = deepcopy(dataframe[mask])
+
+            dataframe_filtered = self.completeDataFrameFiltered[trainingSet]
+
+            disapeared_cloud_index = filtered_out[filtered_out["zc_end_value"]<0].index
+
+            filtered_out.loc[disapeared_cloud_index, "zc_last_hour"] = 0
+            filtered_out.loc[disapeared_cloud_index, "delta_zm"] = 0
+
+            filtered_out.plot.scatter(x="zc_last_hour",
+                                      y="delta_zm",
+                                      ax=current_axes,
+                                      color=red_color,
+                                      alpha=0.3)
+
+            dataframe_filtered.plot.scatter(x="zc_last_hour",
+                                            y="delta_zm",
+                                            ax=current_axes,
+                                            color = blue_color,
+                                            alpha=0.3)
+
+
+        # tweaks
+        start = 0.0
+        end = 3000
+        interval = 500
+        ticks = numpy.arange(start, end + .01, interval)
+        tickLabels = [f"{t:.0f}" for t in ticks]
+
+        showList = Data.cycleBoolean(len(ticks))
+
+        showList[0] = True
+        showList[-1] = False
+
+
+        ystart = 0.0
+        yend = 1250
+        yinterval = 250
+        yticks = numpy.arange(ystart, yend + .01, yinterval)
+        ytickLabels = [f"{t:.0f}" for t in yticks]
+
+        yshowList = Data.cycleBoolean(len(ticks))
+
+        yshowList[0] = True
+        yshowList[-1] = False
+
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            current_axes = fig.getAxes(ind)
+
+            current_axes.set_xlim([start, end])
+            current_axes.set_ylim([ystart, yend])
+            PlotTweak.setYaxisLabel(current_axes,"")
+            PlotTweak.setXaxisLabel(current_axes,"")
+
+
+
+            if ind in [0,1]:
+                PlotTweak.hideXTickLabels(current_axes)
+            if ind in [1,3]:
+                PlotTweak.hideYTickLabels(current_axes)
+
+            current_axes.set_xticks(ticks)
+            current_axes.set_xticklabels(tickLabels)
+            PlotTweak.hideLabels(current_axes.xaxis, showList)
+
+            current_axes.set_yticks(yticks)
+            current_axes.set_yticklabels(ytickLabels)
+            PlotTweak.hideLabels(current_axes.yaxis, yshowList)
+
+            PlotTweak.setAnnotation(current_axes,
+                                    self.annotationCollection[trainingSet],
+                                    xPosition=PlotTweak.getXPosition(current_axes, 0.05),
+                                    yPosition = PlotTweak.getYPosition(current_axes, 0.9))
+
+            if ind == 0:
+                collectionOfLabelsColors = {"Cloud base change" : blue_color,
+                                            "Cloud base change (filtered out)" : red_color,
+                                            }
+                legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
+
+                artist = current_axes.legend(handles=legendLabelColors,
+                                             loc=(0.0, 1.03),
+                                             frameon=True,
+                                             framealpha=1.0,
+                                             ncol=1)
+
+                current_axes.add_artist(artist)
+
+            if ind == 3:
+                current_axes.text(PlotTweak.getXPosition(current_axes, -0.7), PlotTweak.getYPosition(current_axes, -0.25),
+                                   PlotTweak.getUnitLabel("Cloud\ top\ height\ average\ last\ hour", "m"), size=8)
+            if ind == 0:
+                current_axes.text(PlotTweak.getXPosition(current_axes, -0.33), PlotTweak.getYPosition(current_axes, -0.8),
+                                  PlotTweak.getUnitLabel("Mixed\ Layer\ cloud\ thickness\ last\ hour", "m"), size=8, rotation=90)
+
+    def figure_mixed_layer_cloud_thickness_histogram(self):
+        name = "figure_mixed_layer_cloud_thickness_histogram"
+        self.figures[name] = Figure(self.figureFolder,name, figsize = [self.figureWidth, 4],
+                                    ncols=2, nrows=2,
+                                    hspace=0.08, wspace=0.12,
+                                    bottom=0.11, top=0.93,
+                                    )
+
+        fig = self.figures[name]
+        blue_color = Colorful.getDistinctColorList("blue")
+        # red_color = Colorful.getDistinctColorList("red")
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            current_axes = fig.getAxes(ind)
+            # dataframe = self.completeDataFrame[trainingSet]
+            dataframe_filtered = self.completeDataFrameFiltered[trainingSet]
+
+            # dataframe["lwp_rwp_relative_change"].plot.hist(ax=current_axes, color = red_color )
+            dataframe_filtered["delta_zm"].plot.hist(ax=current_axes, color = blue_color)
+
+
+        # tweaks
+        start = 0.0
+        end = 1250
+        interval = 250
+        ticks = numpy.arange(start, end + interval, interval)
+        tickLabels = [f"{t:.0f}" for t in ticks]
+
+        showList = Data.cycleBoolean(len(ticks))
+
+        showList[0] = True
+        showList[-1] = False
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            current_axes = fig.getAxes(ind)
+
+            if "4" in trainingSet:
+                yticks = numpy.arange(0, 40, 10)
+                ytickLabels = [f"{t:d}" for t in yticks]
+
+            else:
+                yticks = numpy.arange(0, 126, 25)
+                ytickLabels = [f"{t:d}" for t in yticks]
+
+            yshowList = Data.cycleBoolean(len(yticks))
+            yshowList[-1] =False
+
+            current_axes.set_xlim([start, end])
+            PlotTweak.setYaxisLabel(current_axes,"")
+
+
+
+            if ind in [0,1]:
+                PlotTweak.hideXTickLabels(current_axes)
+            if ind in [1,3]:
+                PlotTweak.hideYTickLabels(current_axes)
+
+            current_axes.set_xticks(ticks)
+            current_axes.set_xticklabels(tickLabels)
+            PlotTweak.hideLabels(current_axes.xaxis, showList)
+
+            current_axes.set_yticks(yticks)
+            current_axes.set_yticklabels(ytickLabels)
+            PlotTweak.hideLabels(current_axes.yaxis, yshowList)
+
+            PlotTweak.setAnnotation(current_axes,
+                                    self.annotationCollection[trainingSet],
+                                    xPosition=PlotTweak.getXPosition(current_axes, 0.05),
+                                    yPosition = PlotTweak.getYPosition(current_axes, 0.9))
+
+            if ind == 0:
+                collectionOfLabelsColors = {"Total water path (LWP + RWP) relative change" : blue_color,
+                                            #"LWP relative change (all LES data)" : red_color,
+                                            }
+                legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
+
+                artist = current_axes.legend(handles=legendLabelColors,
+                                             loc=(0.0, 1.03),
+                                             frameon=True,
+                                             framealpha=1.0,
+                                             ncol=1)
+
+                current_axes.add_artist(artist)
+
+            if ind == 0:
+                current_axes.text(PlotTweak.getXPosition(current_axes, -0.25), PlotTweak.getYPosition(current_axes, -0.25),
+                                  "Frequency", size=8, rotation=90)
+            if ind == 3:
+                current_axes.text(PlotTweak.getXPosition(current_axes, -0.7), PlotTweak.getYPosition(current_axes, -0.25),
+                                   PlotTweak.getUnitLabel("Mixed\ Layer\ cloud\ thickness\ last\ hour", "m"), size=8)
+
 def main():
     try:
         locationsFile = sys.argv[1]
@@ -402,6 +800,10 @@ def main():
     figObject.figure_surface_precipitation_accumulated()
     figObject.figure_rwp_last_hour()
     figObject.figure_lwp_scatter_plot()
+    figObject.figure_cloud_top_scatter_plot()
+    figObject.figure_cloud_base_scatter_plot()
+    figObject.figure_mixed_layer_cloud_thickness_vs_cloud_top_height_scatter_plot()
+    figObject.figure_mixed_layer_cloud_thickness_histogram()
 
     figObject.finalise()
 
