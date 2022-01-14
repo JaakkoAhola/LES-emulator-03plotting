@@ -788,6 +788,387 @@ class FiguresRevision(ManuscriptFigures):
                 current_axes.text(PlotTweak.getXPosition(current_axes, -0.7), PlotTweak.getYPosition(current_axes, -0.25),
                                    PlotTweak.getUnitLabel("Mixed\ Layer\ cloud\ thickness\ last\ hour", "m"), size=8)
 
+    def figure_wpos_tendency(self):
+        name = "figure_wpos_tendency"
+        self.figures[name] = Figure(self.figureFolder,name, figsize = [self.figureWidth, 4],
+                                    ncols=2, nrows=2,
+                                    hspace=0.08, wspace=0.12,
+                                    bottom=0.13, top=0.90,
+                                    )
+
+        fig = self.figures[name]
+        blue_color = Colorful.getDistinctColorList("blue")
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            current_axes = fig.getAxes(ind)
+            dataframe_filtered = self.completeDataFrameFiltered[trainingSet]
+
+            dataframe_filtered["WposLastHourTendency"].plot.hist(ax=current_axes, color = blue_color)
+
+        start = -0.2
+        end = -start
+        interval = 0.05
+        ticks = numpy.arange(start, end + interval, interval)
+        tickLabels = [f"{t:.2f}" for t in ticks]
+        tickLabels[tickLabels.index("-0.00")] = "0"
+
+        showList = Data.cycleBoolean(len(ticks))
+
+        showList[0] = False
+        showList[-1] = False
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            current_axes = fig.getAxes(ind)
+
+            if "4" in trainingSet:
+                yticks = numpy.arange(0, 55, 10)
+                ytickLabels = [f"{t:d}" for t in yticks]
+
+            else:
+                yticks = numpy.arange(0, 301, 25)
+                ytickLabels = [f"{t:d}" for t in yticks]
+
+            yshowList = Data.cycleBoolean(len(yticks))
+            yshowList[-1] =False
+
+            current_axes.set_xlim([start, end])
+            PlotTweak.setYaxisLabel(current_axes,"")
+
+
+            if ind in [0,1]:
+                PlotTweak.hideXTickLabels(current_axes)
+            if ind in [1,3]:
+                PlotTweak.hideYTickLabels(current_axes)
+
+            current_axes.set_xticks(ticks)
+            current_axes.set_xticklabels(tickLabels)
+            PlotTweak.hideLabels(current_axes.xaxis, showList)
+
+            current_axes.set_yticks(yticks)
+            current_axes.set_yticklabels(ytickLabels)
+            PlotTweak.hideLabels(current_axes.yaxis, yshowList)
+
+            PlotTweak.setXTickSizes(current_axes, Data.cycleBoolean(len(ticks)))
+            PlotTweak.setYTickSizes(current_axes, Data.cycleBoolean(len(yticks)))
+
+
+            PlotTweak.setAnnotation(current_axes,
+                                    self.annotationCollection[trainingSet],
+                                    xPosition=PlotTweak.getXPosition(current_axes, 0.05),
+                                    yPosition = PlotTweak.getYPosition(current_axes, 0.9))
+
+            if ind == 0:
+                collectionOfLabelsColors = {"""Domain mean updraft velocity at cloud base
+change during last hour""" : blue_color,
+                                            #"LWP relative change (all LES data)" : red_color,
+                                            }
+                legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
+
+                artist = current_axes.legend(handles=legendLabelColors,
+                                             loc=(0.25, 1.03),
+                                             frameon=True,
+                                             framealpha=1.0,
+                                             ncol=1)
+
+                current_axes.add_artist(artist)
+
+            if ind == 0:
+                current_axes.text(PlotTweak.getXPosition(current_axes, -0.25), PlotTweak.getYPosition(current_axes, -0.25),
+                                  "Frequency", size=8, rotation=90)
+            if ind == 3:
+                current_axes.text(PlotTweak.getXPosition(current_axes, -0.35), PlotTweak.getYPosition(current_axes, -0.25),
+                                   PlotTweak.getUnitLabel(r"\frac{d(w_{pos.dom.})}{dt}", "m s^{-1} h^{-1}"), size=8)
+
+
+    def figure_temperature_decoupled(self):
+        name = "figure_temperature_decoupled"
+        self.figures[name] = Figure(self.figureFolder,name, figsize = [self.figureWidth, 4],
+                                    ncols=2, nrows=2,
+                                    hspace=0.08, wspace=0.12,
+                                    bottom=0.11, top=0.93,
+                                    )
+
+        fig = self.figures[name]
+        blue_color = Colorful.getDistinctColorList("blue")
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            current_axes = fig.getAxes(ind)
+            dataframe_filtered = self.completeDataFrameFiltered[trainingSet]
+            temperature = dataframe_filtered["temperature_decoupled"]
+            print(f"{trainingSet} temperature decoupled, min: {temperature.min():.5f}, max: {temperature.max():.5f}", )
+            temperature.plot.hist(ax=current_axes,
+                                  color=blue_color)
+
+        start = 0.0
+        end = 1.5
+        interval = 0.25
+        ticks = numpy.arange(start, end + interval, interval)
+        tickLabels = [f"{t:.2f}" for t in ticks]
+        tickLabels[0] = "0"
+
+        showList = Data.cycleBoolean(len(ticks))
+        # showList[0] = False
+        # showList[-1] = False
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            current_axes = fig.getAxes(ind)
+
+            if "4" in trainingSet:
+                yend=60
+                yticks = numpy.arange(0, yend+1, 10)
+                ytickLabels = [f"{t:d}" for t in yticks]
+
+            else:
+                yend=200
+                yticks = numpy.arange(0, yend+1, 25)
+                ytickLabels = [f"{t:d}" for t in yticks]
+
+            yshowList = Data.cycleBoolean(len(yticks))
+
+
+            current_axes.set_xlim([start, end])
+            current_axes.set_ylim([0, yend])
+            PlotTweak.setYaxisLabel(current_axes,"")
+
+            current_axes.set_xticks(ticks)
+            current_axes.set_xticklabels(tickLabels)
+
+
+            if ind in [0,1]:
+                PlotTweak.hideXTickLabels(current_axes)
+            if ind in [1,3]:
+                PlotTweak.hideYTickLabels(current_axes)
+
+
+            PlotTweak.hideLabels(current_axes.xaxis, showList)
+
+            current_axes.set_yticks(yticks)
+            current_axes.set_yticklabels(ytickLabels)
+            PlotTweak.hideLabels(current_axes.yaxis, yshowList)
+
+            PlotTweak.setXTickSizes(current_axes, Data.cycleBoolean(len(ticks)))
+            PlotTweak.setYTickSizes(current_axes, Data.cycleBoolean(len(yticks)))
+
+
+            PlotTweak.setAnnotation(current_axes,
+                                    self.annotationCollection[trainingSet],
+                                    xPosition=PlotTweak.getXPosition(current_axes, 0.05),
+                                    yPosition = PlotTweak.getYPosition(current_axes, 0.9))
+
+            if ind == 0:
+                collectionOfLabelsColors = {"Temperature difference" : blue_color,
+
+                                            }
+                legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
+
+                artist = current_axes.legend(handles=legendLabelColors,
+                                             loc=(0.65, 1.03),
+                                             frameon=True,
+                                             framealpha=1.0,
+                                             ncol=1)
+
+                current_axes.add_artist(artist)
+
+            if ind == 0:
+                current_axes.text(PlotTweak.getXPosition(current_axes, -0.25),
+                                  PlotTweak.getYPosition(current_axes, -0.25),
+                                  "Frequency",
+                                  size=8,
+                                  rotation=90)
+            if ind == 3:
+                current_axes.text(PlotTweak.getXPosition(current_axes, -0.35),
+                                  PlotTweak.getYPosition(current_axes, -0.25),
+                                  PlotTweak.getUnitLabel(r"\theta_{l,top}-\theta_{l,bot}", "K"),
+                                  size=8)
+
+
+    def figure_water_decoupled(self):
+        name = "figure_water_decoupled"
+        self.figures[name] = Figure(self.figureFolder,name, figsize = [self.figureWidth, 4],
+                                    ncols=2, nrows=2,
+                                    hspace=0.08, wspace=0.12,
+                                    bottom=0.11, top=0.93,
+                                    )
+
+        fig = self.figures[name]
+        blue_color = Colorful.getDistinctColorList("blue")
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            current_axes = fig.getAxes(ind)
+            dataframe_filtered = self.completeDataFrameFiltered[trainingSet]
+            water = dataframe_filtered["water_decoupled"]
+            water.plot.hist(ax=current_axes, color = blue_color)
+
+        start = -0.5
+        end = 0.1
+        interval = .1
+        ticks = numpy.arange(start, end + interval, interval)
+        tickLabels = [f"{t:.1f}" for t in ticks]
+
+
+        showList = Data.cycleBoolean(len(ticks), startBoolean = False)
+
+        # showList[0] = False
+        # showList[-1] = False
+        return
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            current_axes = fig.getAxes(ind)
+
+            if "4" in trainingSet:
+                yticks = numpy.arange(0, 71, 10)
+                ytickLabels = [f"{t:d}" for t in yticks]
+
+            else:
+                yticks = numpy.arange(0, 201, 25)
+                ytickLabels = [f"{t:d}" for t in yticks]
+
+            yshowList = Data.cycleBoolean(len(yticks))
+            yshowList[-1] =True
+
+            current_axes.set_xlim([start, end])
+            PlotTweak.setYaxisLabel(current_axes,"")
+
+
+            if ind in [0,1]:
+                PlotTweak.hideXTickLabels(current_axes)
+            if ind in [1,3]:
+                PlotTweak.hideYTickLabels(current_axes)
+
+            current_axes.set_xticks(ticks)
+            current_axes.set_xticklabels(tickLabels)
+            PlotTweak.hideLabels(current_axes.xaxis, showList)
+
+            current_axes.set_yticks(yticks)
+            current_axes.set_yticklabels(ytickLabels)
+            PlotTweak.hideLabels(current_axes.yaxis, yshowList)
+
+            PlotTweak.setXTickSizes(current_axes, Data.cycleBoolean(len(ticks)))
+            PlotTweak.setYTickSizes(current_axes, Data.cycleBoolean(len(yticks)))
+
+
+            PlotTweak.setAnnotation(current_axes,
+                                    self.annotationCollection[trainingSet],
+                                    xPosition=PlotTweak.getXPosition(current_axes, 0.05),
+                                    yPosition = PlotTweak.getYPosition(current_axes, 0.9))
+
+            if ind == 0:
+                collectionOfLabelsColors = {"Temperature difference" : blue_color,
+
+                                            }
+                legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
+
+                artist = current_axes.legend(handles=legendLabelColors,
+                                             loc=(0.65, 1.03),
+                                             frameon=True,
+                                             framealpha=1.0,
+                                             ncol=1)
+
+                current_axes.add_artist(artist)
+
+            if ind == 0:
+                current_axes.text(PlotTweak.getXPosition(current_axes, -0.25), PlotTweak.getYPosition(current_axes, -0.25),
+                                  "Frequency", size=8, rotation=90)
+            if ind == 3:
+                current_axes.text(PlotTweak.getXPosition(current_axes, -0.35), PlotTweak.getYPosition(current_axes, -0.25),
+                                   PlotTweak.getUnitLabel(r"q_{bot}-q_{top}", "g\ kg^{-1}"), size=8)
+    def figure_decoupled_scatter(self):
+        name = "figure_decoupled_scatter"
+        self.figures[name] = Figure(self.figureFolder,name, figsize = [self.figureWidth, 4],
+                                    ncols=2, nrows=2,
+                                    hspace=0.08, wspace=0.12,
+                                    bottom=0.15, top=0.93,
+                                    left = 0.15, right=0.97,
+                                    )
+
+        fig = self.figures[name]
+        green_color = Colorful.getDistinctColorList("green")
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            current_axes = fig.getAxes(ind)
+            dataframe_filtered = self.completeDataFrameFiltered[trainingSet]
+
+            dataframe_filtered.plot.scatter(x="temperature_decoupled",
+                                            y="water_decoupled",
+                                            ax=current_axes,
+                                            c="prcp",
+                                            colormap='viridis',
+                                            alpha=0.3)
+
+            current_axes.axhline(y=0.5, c="b")
+            current_axes.axvline(x=0.5, c="r")
+
+        start = 0.
+        end = 1.5
+        interval = 0.25
+        ticks = numpy.arange(start, end + interval, interval)
+        tickLabels = [f"{t:.1f}" for t in ticks]
+        tickLabels[0] = "0"
+
+        showList = Data.cycleBoolean(len(ticks))
+
+        # showList[0] = False
+        # showList[-1] = False
+        ystart = 0
+        yend = 1.5
+        yinterval = 0.25
+        yticks = numpy.arange(ystart, yend + yinterval, yinterval)
+        ytickLabels = [f"{t:.1f}" for t in yticks]
+        ytickLabels[0] = "0"
+
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            current_axes = fig.getAxes(ind)
+            PlotTweak.setYaxisLabel(current_axes,"")
+            PlotTweak.setXaxisLabel(current_axes,"")
+
+            yshowList = Data.cycleBoolean(len(yticks))
+            yshowList[-1] =True
+
+            current_axes.set_xlim([start, end])
+            current_axes.set_ylim([ystart, yend])
+            PlotTweak.setYaxisLabel(current_axes,"")
+
+            current_axes.set_xticks(ticks)
+            current_axes.set_xticklabels(tickLabels)
+            PlotTweak.hideLabels(current_axes.xaxis, showList)
+
+            current_axes.set_yticks(yticks)
+            current_axes.set_yticklabels(ytickLabels)
+            PlotTweak.hideLabels(current_axes.yaxis, yshowList)
+
+            if ind in [0,1]:
+                PlotTweak.hideXTickLabels(current_axes)
+            if ind in [1,3]:
+                PlotTweak.hideYTickLabels(current_axes)
+
+            PlotTweak.setXTickSizes(current_axes, Data.cycleBoolean(len(ticks)))
+            PlotTweak.setYTickSizes(current_axes, Data.cycleBoolean(len(yticks)))
+
+
+            PlotTweak.setAnnotation(current_axes,
+                                    self.annotationCollection[trainingSet],
+                                    xPosition=PlotTweak.getXPosition(current_axes, 0.05),
+                                    yPosition = PlotTweak.getYPosition(current_axes, 0.9))
+
+            if ind == 0:
+                collectionOfLabelsColors = {"Water & temperature difference" : green_color,
+
+                                            }
+                legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
+
+                artist = current_axes.legend(handles=legendLabelColors,
+                                             loc=(0.45, 1.03),
+                                             frameon=True,
+                                             framealpha=1.0,
+                                             ncol=1)
+
+                current_axes.add_artist(artist)
+
+            if ind == 0:
+                current_axes.text(PlotTweak.getXPosition(current_axes, -0.35),
+                                  PlotTweak.getYPosition(current_axes, -0.25),
+                                  PlotTweak.getUnitLabel(r"q_{bot}-q_{top}", "g\ kg^{-1}"),
+                                  size=8,
+                                  rotation=90)
+            if ind == 3:
+                current_axes.text(PlotTweak.getXPosition(current_axes, -0.35),
+                                  PlotTweak.getYPosition(current_axes, -0.35),
+                                  PlotTweak.getUnitLabel(r"\theta_{l,top}-\theta_{l,bot}", "K"),
+                                  size=8)
+
 def main():
     try:
         locationsFile = sys.argv[1]
@@ -804,6 +1185,11 @@ def main():
     figObject.figure_cloud_base_scatter_plot()
     figObject.figure_mixed_layer_cloud_thickness_vs_cloud_top_height_scatter_plot()
     figObject.figure_mixed_layer_cloud_thickness_histogram()
+    figObject.figure_wpos_tendency()
+    figObject.figure_temperature_decoupled()
+    figObject.figure_water_decoupled()
+    figObject.figure_decoupled_scatter()
+
 
     figObject.finalise()
 
