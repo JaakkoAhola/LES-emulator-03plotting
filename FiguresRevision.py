@@ -198,7 +198,7 @@ class FiguresRevision(ManuscriptFigures):
         name = "figure_surface_precipitation_accumulated"
         self.figures[name] = Figure(self.figureFolder,name, figsize = [self.figureWidth, 4],
                                                  ncols=2, nrows=2,
-                                                 bottom=0.11, top=0.87,
+                                                 bottom=0.18, top=0.93,
                                                  hspace=0.18, wspace=0.24,
                                                  right=0.95
                                                  )
@@ -211,7 +211,7 @@ class FiguresRevision(ManuscriptFigures):
             dataframe = self.completeDataFrame[trainingSet]
             dataframe_filtered = self.completeDataFrameFiltered[trainingSet]
             print(trainingSet, numpy.log10(dataframe["surface_precipitation_accumulated"].max()))
-            dataframe["surface_precipitation_accumulated"].plot.hist(ax=current_axes, color = red_color )
+            # dataframe["surface_precipitation_accumulated"].plot.hist(ax=current_axes, color = red_color )
             dataframe_filtered["surface_precipitation_accumulated"].plot.hist(ax=current_axes, color = blue_color)
 
         # tweaks
@@ -263,12 +263,12 @@ class FiguresRevision(ManuscriptFigures):
             PlotTweak.hideLabels(current_axes.yaxis, yshowList)
 
             if ind == 0:
-                collectionOfLabelsColors = {"Accumulated surface precipitation (LES filtered data)" : blue_color,
-                                            "Accumulated surface precipitation (all LES data)" : red_color,}
+                collectionOfLabelsColors = {"Accumulated surface precipitation" : blue_color,
+                                            }
                 legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
 
                 artist = current_axes.legend(handles=legendLabelColors,
-                                             loc=(0.0, 1.03),
+                                             loc=(0.3, 1.03),
                                              frameon=True,
                                              framealpha=1.0,
                                              ncol=1)
@@ -276,10 +276,11 @@ class FiguresRevision(ManuscriptFigures):
                 current_axes.add_artist(artist)
 
             if ind == 3:
-                current_axes.text(PlotTweak.getXPosition(current_axes, -0.3), PlotTweak.getYPosition(current_axes, -0.25),
-                                  "(" + PlotTweak.getLatexLabel("kg\ m^{-2} s^{-1}") + ")", size=8)
+                current_axes.text(PlotTweak.getXPosition(current_axes, -0.4), PlotTweak.getYPosition(current_axes, -0.39),
+                                  PlotTweak.getUnitLabel(r"\sum_{start}^{end} prcp_{surf.}", "kg\ m^{-2} s^{-1}"),
+                                  size=8)
             if ind == 0:
-                current_axes.text(PlotTweak.getXPosition(current_axes, -0.3), PlotTweak.getYPosition(current_axes, -0.25),
+                current_axes.text(PlotTweak.getXPosition(current_axes, -0.3), PlotTweak.getYPosition(current_axes, -0.45),
                                   "Frequency", size=8, rotation=90)
 
     def figure_rwp_last_hour(self):
@@ -379,13 +380,14 @@ class FiguresRevision(ManuscriptFigures):
         self.figures[name] = Figure(self.figureFolder,name, figsize = [self.figureWidth, 4],
                                     ncols=2, nrows=2,
                                     hspace=0.08, wspace=0.12,
-                                    bottom=0.11, top=0.87,
+                                    bottom=0.11, top=0.93,
                                     left=0.15
                                     )
 
         fig = self.figures[name]
         blue_color = Colorful.getDistinctColorList("blue")
         red_color = Colorful.getDistinctColorList("red")
+        includeFilteredOut = False
         for ind, trainingSet in enumerate(self.trainingSetList):
             current_axes = fig.getAxes(ind)
 
@@ -399,12 +401,6 @@ class FiguresRevision(ManuscriptFigures):
             disapeared_cloud_index = filtered_out[filtered_out["zc_end_value"]<0].index
 
             filtered_out.loc[disapeared_cloud_index, "zc_end_value"] = 0
-
-            filtered_out.plot.scatter(x="zc_first",
-                                      y="zc_end_value",
-                                      ax=current_axes,
-                                      color=red_color,
-                                      alpha=0.3)
 
             dataframe_filtered.plot.scatter(x="zc_first",
                                             y="zc_end_value",
@@ -455,12 +451,11 @@ class FiguresRevision(ManuscriptFigures):
 
             if ind == 0:
                 collectionOfLabelsColors = {"Cloud top change" : blue_color,
-                                            "Cloud top change (filtered out)" : red_color,
                                             }
                 legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
 
                 artist = current_axes.legend(handles=legendLabelColors,
-                                             loc=(0.0, 1.03),
+                                             loc=(0.7, 1.03),
                                              frameon=True,
                                              framealpha=1.0,
                                              ncol=1)
@@ -480,13 +475,14 @@ class FiguresRevision(ManuscriptFigures):
         self.figures[name] = Figure(self.figureFolder,name, figsize = [self.figureWidth, 4],
                                     ncols=2, nrows=2,
                                     hspace=0.08, wspace=0.12,
-                                    bottom=0.11, top=0.87,
+                                    bottom=0.11, top=0.93,
                                     left=0.15
                                     )
 
         fig = self.figures[name]
         blue_color = Colorful.getDistinctColorList("blue")
         red_color = Colorful.getDistinctColorList("red")
+        includeFilteredOut = False
         for ind, trainingSet in enumerate(self.trainingSetList):
             current_axes = fig.getAxes(ind)
 
@@ -501,7 +497,8 @@ class FiguresRevision(ManuscriptFigures):
 
             filtered_out.loc[disapeared_cloud_index, "zb_end_value"] = 0
 
-            filtered_out.plot.scatter(x="zb_first",
+            if includeFilteredOut:
+                filtered_out.plot.scatter(x="zb_first",
                                       y="zb_end_value",
                                       ax=current_axes,
                                       color=red_color,
@@ -556,12 +553,14 @@ class FiguresRevision(ManuscriptFigures):
 
             if ind == 0:
                 collectionOfLabelsColors = {"Cloud base change" : blue_color,
-                                            "Cloud base change (filtered out)" : red_color,
                                             }
+                if includeFilteredOut:
+                    collectionOfLabelsColors["Cloud base change (filtered out)"] = red_color
+
                 legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
 
                 artist = current_axes.legend(handles=legendLabelColors,
-                                             loc=(0.0, 1.03),
+                                             loc=(0.7, 1.03),
                                              frameon=True,
                                              framealpha=1.0,
                                              ncol=1)
@@ -1074,8 +1073,9 @@ change during last hour""" : blue_color,
             dataframe_filtered.plot.scatter(x="temperature_decoupled",
                                             y="water_decoupled",
                                             ax=current_axes,
-                                            c="prcp",
-                                            colormap='viridis',
+                                            color=green_color,
+                                            # c="prcp",
+                                            # colormap='viridis',
                                             alpha=0.3)
 
             current_axes.axhline(y=0.5, c="b")
@@ -1384,43 +1384,124 @@ change during last hour""" : blue_color,
         hardDict = dict(zip(keys, hardLimit))
         softDict = dict(zip(keys, softLimit))
         signDict = dict(zip(keys, sign))
+        scatter_alpha = 0.9
 
-        colors = Colorful.getDistinctColorList(["blue", "red", "orange"])
+        colors = Colorful.getDistinctColorList(["blue", "orange", "red"])
         for ind, trainingSet in enumerate(self.trainingSetList):
             current_axes = fig.getAxes(ind)
             dataframe = self.completeDataFrame[trainingSet]
             dataframe = dataframe[dataframe[self.responseVariable]>0]
+
+            radiativeCooling  = dataframe["drflx"].values
+            poly1d_Observation = numpy.poly1d(numpy.asarray([self.observationParameters["slope"],self.observationParameters["intercept"] ])) #?0.44 ×CTRC+
+            current_axes.fill_between(sorted(radiativeCooling),
+                        poly1d_Observation(sorted(radiativeCooling)) - self.observationParameters["error"]*numpy.ones(numpy.shape(radiativeCooling)), poly1d_Observation(sorted(radiativeCooling)) + self.observationParameters["error"]*numpy.ones(numpy.shape(radiativeCooling)),
+                        alpha=0.2)
+
             colorInd = 0
             dataframe.plot.scatter(x="drflx",
                                    y=self.responseVariable,
                                    ax=current_axes,
-                                   color = colors[colorInd])
+                                   color = colors[colorInd],
+                                   alpha=scatter_alpha)
 
             # hard limits
             sub_df = dataframe[ dataframe["cloudTopRelativeChange"] > hardLimit[0]]
             sub_df.plot.scatter(x="drflx",
                                 y=self.responseVariable,
                                 ax=current_axes,
-                                color=colors[1])
+                                color=colors[2],
+                                alpha=scatter_alpha)
 
             sub_df = dataframe[ dataframe["cfracEndValue"] < hardLimit[1]]
             sub_df.plot.scatter(x="drflx",
                                 y=self.responseVariable,
                                 ax=current_axes,
-                                color=colors[1])
+                                color=colors[2],
+                                alpha=scatter_alpha)
             # soft limits
             sub_df = dataframe[ dataframe["cloudTopRelativeChange"] > softLimit[0]]
             sub_df.plot.scatter(x="drflx",
                                 y=self.responseVariable,
                                 ax=current_axes,
-                                color=colors[2])
+                                color=colors[1],
+                                alpha=scatter_alpha)
 
             sub_df = dataframe[ dataframe["cfracEndValue"] < softLimit[1]]
             sub_df.plot.scatter(x="drflx",
                                 y=self.responseVariable,
                                 ax=current_axes,
-                                color=colors[2])
+                                color=colors[1],
+                                alpha=scatter_alpha)
 
+        xstart = -140
+        xend = 50
+        xinterval = 10
+        ticks = numpy.arange(xstart, xend+xinterval, xinterval)
+        tickLabels = [f"{t:d}" for t in ticks]
+
+        showList = Data.cycleBoolean(len(ticks))
+
+        # showList[0] = False
+        # showList[-1] = False
+        ystart = 0
+        yend = 1.0
+        yinterval = 0.1
+        yticks = numpy.arange(ystart, yend + yinterval, yinterval)
+        ytickLabels = [f"{t:.1f}" for t in yticks]
+        ytickLabels[0] = "0"
+        yshowList = Data.cycleBoolean(len(yticks))
+        yshowList[-1] =True
+        index = ["NA", "Soft", "Hard"]
+
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            current_axes = fig.getAxes(ind)
+            PlotTweak.setYaxisLabel(current_axes,"")
+            PlotTweak.setXaxisLabel(current_axes,"")
+
+            current_axes.set_xlim([xstart, xend])
+            current_axes.set_ylim([ystart, yend])
+            PlotTweak.setYaxisLabel(current_axes,"")
+
+            current_axes.set_xticks(ticks)
+            current_axes.set_xticklabels(tickLabels, rotation=-30)
+            PlotTweak.hideLabels(current_axes.xaxis, showList)
+
+            current_axes.set_yticks(yticks)
+            current_axes.set_yticklabels(ytickLabels)
+            PlotTweak.hideLabels(current_axes.yaxis, yshowList)
+
+            if ind in [0,1]:
+                PlotTweak.hideXTickLabels(current_axes)
+            if ind in [1,3]:
+                PlotTweak.hideYTickLabels(current_axes)
+
+            PlotTweak.setXTickSizes(current_axes, Data.cycleBoolean(len(ticks)))
+            PlotTweak.setYTickSizes(current_axes, Data.cycleBoolean(len(yticks)))
+
+
+            PlotTweak.setAnnotation(current_axes,
+                                    self.annotationCollection[trainingSet],
+                                    xPosition=PlotTweak.getXPosition(current_axes, 0.05),
+                                    yPosition = PlotTweak.getYPosition(current_axes, 0.9))
+
+            if ind == 0:
+                collectionOfLabelsColors = dict(zip(index, colors))
+                legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
+
+                artist = current_axes.legend(handles=legendLabelColors,
+                                             loc=(0.45, 1.03),
+                                             frameon=True,
+                                             framealpha=1.0,
+                                             ncol=3)
+
+                current_axes.add_artist(artist)
+
+            if ind == 0:
+                current_axes.text(PlotTweak.getXPosition(current_axes, -0.27), PlotTweak.getYPosition(current_axes, -0.5),
+                        PlotTweak.getUnitLabel("Simulated" + "\ w_{pos}", "m\ s^{-1}"), size=8 , rotation =90)
+            if ind == 2:
+                current_axes.text(-50,-0.32, PlotTweak.getUnitLabel("Cloud\ top\ radiative\ cooling", "W\ m^{-2}"), size=8)
 
 def main():
     try:
