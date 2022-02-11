@@ -18,6 +18,7 @@ from Colorful import Colorful
 from Data import Data
 from Figure import Figure
 from PlotTweak import PlotTweak
+import pandas
 
 
 sys.path.append("../LES-emulator-02postpros")
@@ -199,20 +200,13 @@ class FiguresRevision(ManuscriptFigures):
         self.figures[name] = Figure(self.figureFolder,name, figsize = [self.figureWidth, 4],
                                                  ncols=2, nrows=2,
                                                  bottom=0.18, top=0.93,
-                                                 hspace=0.18, wspace=0.24,
+                                                 hspace=0.18, wspace=0.14,
                                                  right=0.95
                                                  )
         fig = self.figures[name]
         blue_color = Colorful.getDistinctColorList("blue")
         red_color = Colorful.getDistinctColorList("red")
 
-        for ind, trainingSet in enumerate(self.trainingSetList):
-            current_axes = fig.getAxes(ind)
-            dataframe = self.completeDataFrame[trainingSet]
-            dataframe_filtered = self.completeDataFrameFiltered[trainingSet]
-            print(trainingSet, numpy.log10(dataframe["surface_precipitation_accumulated"].max()))
-            # dataframe["surface_precipitation_accumulated"].plot.hist(ax=current_axes, color = red_color )
-            dataframe_filtered["surface_precipitation_accumulated"].plot.hist(ax=current_axes, color = blue_color)
 
         # tweaks
 
@@ -220,26 +214,34 @@ class FiguresRevision(ManuscriptFigures):
         for ind, trainingSet in enumerate(self.trainingSetList):
             if "4" in trainingSet:
                 start = 0.0
-                end = 4e-4
-                interval = 1e-4
+                end = 0.16
+                interval = 0.02
                 ticks = numpy.arange(start, end + interval, interval)
-                tickLabels = [f"{t:.0e}" for t in ticks]
+                tickLabels = [f"{t:.2f}" for t in ticks]
                 tickLabels[0] = "0"
 
-                yticks = numpy.arange(start, 151, 25)
+                yticks = numpy.arange(start, 125+1, 25)
                 ytickLabels = [f"{t:.0f}" for t in yticks]
 
             else:
                 start = 0.0
-                end = 4e-3
-                interval = 1e-3
+                end = 0.8
+                interval = 0.1
                 ticks = numpy.arange(start, end + interval, interval)
-                tickLabels = [f"{t:.0e}" for t in ticks]
+                tickLabels = [f"{t:.1f}" for t in ticks]
                 tickLabels[0] = "0"
 
                 yticks = numpy.arange(start, 501, 100)
                 ytickLabels = [f"{t:.0f}" for t in yticks]
 
+            current_axes = fig.getAxes(ind)
+            dataframe = self.completeDataFrame[trainingSet]
+            dataframe_filtered = self.completeDataFrameFiltered[trainingSet]
+
+            print(trainingSet, "surface_precipitation_accumulated MAX", dataframe["surface_precipitation_accumulated"].max())
+            dataframe_filtered["surface_precipitation_accumulated"].plot.hist(ax=current_axes,
+                                                                              color=blue_color,
+                                                                              bins = ticks)
 
             showList = Data.cycleBoolean(len(ticks))
 
@@ -262,6 +264,18 @@ class FiguresRevision(ManuscriptFigures):
             current_axes.set_yticklabels(ytickLabels)
             PlotTweak.hideLabels(current_axes.yaxis, yshowList)
 
+
+            if ind in [1,3]:
+                PlotTweak.hideYTickLabels(current_axes)
+
+            PlotTweak.setXTickSizes(current_axes, Data.cycleBoolean(len(ticks)))
+            PlotTweak.setYTickSizes(current_axes, Data.cycleBoolean(len(yticks)))
+
+            PlotTweak.setAnnotation(current_axes,
+                                    self.annotationCollection[trainingSet],
+                                    xPosition=PlotTweak.getXPosition(current_axes, 0.25),
+                                    yPosition = PlotTweak.getYPosition(current_axes, 0.9))
+
             if ind == 0:
                 collectionOfLabelsColors = {"Accumulated surface precipitation" : blue_color,
                                             }
@@ -277,7 +291,7 @@ class FiguresRevision(ManuscriptFigures):
 
             if ind == 3:
                 current_axes.text(PlotTweak.getXPosition(current_axes, -0.4), PlotTweak.getYPosition(current_axes, -0.39),
-                                  PlotTweak.getUnitLabel(r"\sum_{start}^{end} prcp_{surf.}", "kg\ m^{-2} s^{-1}"),
+                                  PlotTweak.getUnitLabel(r"\sum_{start}^{end} prcp_{surf.}", "kg\ m^{-2}"),
                                   size=8)
             if ind == 0:
                 current_axes.text(PlotTweak.getXPosition(current_axes, -0.3), PlotTweak.getYPosition(current_axes, -0.45),
@@ -786,12 +800,6 @@ class FiguresRevision(ManuscriptFigures):
                                     )
 
         fig = self.figures[name]
-        blue_color = Colorful.getDistinctColorList("blue")
-        for ind, trainingSet in enumerate(self.trainingSetList):
-            current_axes = fig.getAxes(ind)
-            dataframe_filtered = self.completeDataFrameFiltered[trainingSet]
-
-            dataframe_filtered["WposLastHourTendency"].plot.hist(ax=current_axes, color = blue_color)
 
         start = -0.2
         end = -start
@@ -804,6 +812,17 @@ class FiguresRevision(ManuscriptFigures):
 
         showList[0] = False
         showList[-1] = False
+
+        blue_color = Colorful.getDistinctColorList("blue")
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            current_axes = fig.getAxes(ind)
+            dataframe_filtered = self.completeDataFrameFiltered[trainingSet]
+
+            dataframe_filtered["WposLastHourTendency"].plot.hist(ax=current_axes,
+                                                                 color=blue_color,
+                                                                 bins=ticks)
+
+
         for ind, trainingSet in enumerate(self.trainingSetList):
             current_axes = fig.getAxes(ind)
 
@@ -877,35 +896,35 @@ change during last hour""" : blue_color,
 
         fig = self.figures[name]
         blue_color = Colorful.getDistinctColorList("blue")
-        for ind, trainingSet in enumerate(self.trainingSetList):
-            current_axes = fig.getAxes(ind)
-            dataframe_filtered = self.completeDataFrameFiltered[trainingSet]
-            temperature = dataframe_filtered["temperature_decoupled"]
-            print(f"{trainingSet} temperature decoupled, min: {temperature.min():.5f}, max: {temperature.max():.5f}", )
-            temperature.plot.hist(ax=current_axes,
-                                  color=blue_color)
-
         start = 0.0
         end = 1.5
         interval = 0.25
         ticks = numpy.arange(start, end + interval, interval)
         tickLabels = [f"{t:.2f}" for t in ticks]
         tickLabels[0] = "0"
-
         showList = Data.cycleBoolean(len(ticks))
-        # showList[0] = False
-        # showList[-1] = False
+
+        for ind, trainingSet in enumerate(self.trainingSetList):
+            current_axes = fig.getAxes(ind)
+            dataframe_filtered = self.completeDataFrameFiltered[trainingSet]
+            temperature = dataframe_filtered["temperature_decoupled"]
+            print(f"{trainingSet} temperature decoupled, min: {temperature.min():.5f}, max: {temperature.max():.5f}", )
+            temperature.plot.hist(ax=current_axes,
+                                  color=blue_color,
+                                  bins=ticks)
+
+
         for ind, trainingSet in enumerate(self.trainingSetList):
             current_axes = fig.getAxes(ind)
 
             if "4" in trainingSet:
-                yend=60
+                yend=80
                 yticks = numpy.arange(0, yend+1, 10)
                 ytickLabels = [f"{t:d}" for t in yticks]
 
             else:
-                yend=200
-                yticks = numpy.arange(0, yend+1, 25)
+                yend=400
+                yticks = numpy.arange(0, yend+1, 50)
                 ytickLabels = [f"{t:d}" for t in yticks]
 
             yshowList = Data.cycleBoolean(len(yticks))
@@ -937,7 +956,7 @@ change during last hour""" : blue_color,
 
             PlotTweak.setAnnotation(current_axes,
                                     self.annotationCollection[trainingSet],
-                                    xPosition=PlotTweak.getXPosition(current_axes, 0.05),
+                                    xPosition=PlotTweak.getXPosition(current_axes, 0.35),
                                     yPosition = PlotTweak.getYPosition(current_axes, 0.9))
 
             if ind == 0:
@@ -1406,19 +1425,21 @@ change during last hour""" : blue_color,
                                    alpha=scatter_alpha)
 
             # hard limits
-            sub_df = dataframe[ dataframe["cloudTopRelativeChange"] > hardLimit[0]]
-            sub_df.plot.scatter(x="drflx",
-                                y=self.responseVariable,
-                                ax=current_axes,
-                                color=colors[2],
-                                alpha=scatter_alpha)
+            hard = False
+            if hard:
+                sub_df = dataframe[ dataframe["cloudTopRelativeChange"] > hardLimit[0]]
+                sub_df.plot.scatter(x="drflx",
+                                    y=self.responseVariable,
+                                    ax=current_axes,
+                                    color=colors[2],
+                                    alpha=scatter_alpha)
 
-            sub_df = dataframe[ dataframe["cfracEndValue"] < hardLimit[1]]
-            sub_df.plot.scatter(x="drflx",
-                                y=self.responseVariable,
-                                ax=current_axes,
-                                color=colors[2],
-                                alpha=scatter_alpha)
+                sub_df = dataframe[ dataframe["cfracEndValue"] < hardLimit[1]]
+                sub_df.plot.scatter(x="drflx",
+                                    y=self.responseVariable,
+                                    ax=current_axes,
+                                    color=colors[2],
+                                    alpha=scatter_alpha)
             # soft limits
             sub_df = dataframe[ dataframe["cloudTopRelativeChange"] > softLimit[0]]
             sub_df.plot.scatter(x="drflx",
@@ -1452,7 +1473,7 @@ change during last hour""" : blue_color,
         ytickLabels[0] = "0"
         yshowList = Data.cycleBoolean(len(yticks))
         yshowList[-1] =True
-        index = ["NA", "Soft", "Hard"]
+        index = ["NA", "Filtered out", "Hard"]
 
         for ind, trainingSet in enumerate(self.trainingSetList):
             current_axes = fig.getAxes(ind)
@@ -1486,7 +1507,7 @@ change during last hour""" : blue_color,
                                     yPosition = PlotTweak.getYPosition(current_axes, 0.9))
 
             if ind == 0:
-                collectionOfLabelsColors = dict(zip(index, colors))
+                collectionOfLabelsColors = dict(zip(index[:2], colors[:2]))
                 legendLabelColors = PlotTweak.getPatches(collectionOfLabelsColors)
 
                 artist = current_axes.legend(handles=legendLabelColors,
